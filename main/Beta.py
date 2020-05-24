@@ -13,7 +13,7 @@ from mutagen.mp3 import MP3
 from spotipy.oauth2 import SpotifyClientCredentials
 
 
-#Export or SET (for win32) the needed variables for the Spotify Web API
+# Export or SET (for win32) the needed variables for the Spotify Web API
 os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
 os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
 os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
@@ -30,8 +30,6 @@ class Scope(wx.Frame):
         self.SetBackgroundColour("White")
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour("Gray")
-
-        
 
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
@@ -81,6 +79,17 @@ class Scope(wx.Frame):
         print("Artist: %s" % audio['TPE1'].text[0])
         print("Track: %s" % audio["TIT2"].text[0])
         print("Release Year: %s" % audio["TDRC"].text[0])
+
+        spotify = spotipy.Spotify(
+            client_credentials_manager=SpotifyClientCredentials())
+        artist_name = audio['TPE1'].text[0]
+        tr = audio['TIT2'].text[0]
+
+        # Gets album art cover by track name.
+        result = spotify.search(q=tr, limit=20)
+        for track in result['tracks']['items']:
+            print(track['album']['images'][0]['url'])
+            break
 
         # TODO make possible to put id3 data in database.
 
