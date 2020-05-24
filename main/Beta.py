@@ -59,7 +59,7 @@ class Scope(wx.Frame):
         self.plbox = wx.Panel(self, size=(500, 500))
         self.plbox.SetBackgroundColour("Red")
 
-        #Menubar settings.
+        # Menubar settings.
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
         open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
@@ -72,14 +72,14 @@ class Scope(wx.Frame):
         self.SetMenuBar(menubar)
         self.Bind(wx.EVT_MENU, self.menuhandler)
 
-        #Sizer for different panels.
+        # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
         self.SetSizer(sizer)
         self.Center()
 
-    #Function to handle menubar options.
+    # Function to handle menubar options.
     def menuhandler(self, event):
         id = event.GetId()
         ev = event.GetString()
@@ -94,8 +94,8 @@ class Scope(wx.Frame):
                 try:
                     # TODO Allow the loading of the file
 
-                    loadfile(self.pathname)
-
+                    self.loadfile(self.pathname)
+                    self.playlistd(self.pathname)
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % newfile)
 
@@ -110,11 +110,10 @@ class Scope(wx.Frame):
                 if file.ShowModal() == wx.ID_CANCEL:
                     return
 
-                self.pathname = file.GetPath()
+                self.pathnameforpl = file.GetPath()
                 try:
                     # TODO Allow the loading of the file
-
-                    return self.pathname
+                    self.playlistd(self.pathnameforpl)
 
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % newfile)
@@ -125,7 +124,16 @@ class Scope(wx.Frame):
 
     def playlistd(self, path):
         # TODO Implement playlist adding to playing now.
-        s = 3
+        self.curr_pl = create_connection(currentpl)
+        self.curr_pl.execute('''CREATE TABLE IF NOT EXISTS playlist
+        (title VARCHAR(255) UNIQUE,
+        duration VARCHAR(255),
+        artist VARCHAR(255))''')
+
+        self.curr_pl.commit()
+        song_data = []
+        song_data = self.getMutagenTags(path)
+        insert_into_current(self.curr_pl, song_data)
 
     def getMutagenTags(self, path):
 
@@ -135,18 +143,33 @@ class Scope(wx.Frame):
         print("Track: %s" % audio["TIT2"].text[0])
         print("Release Year: %s" % audio["TDRC"].text[0])
 
+        self.makeCover(audio['TIT2'].text[0])
+        data = []
+
+        # Insert song data in list for inserting in database of currently playing songs.
+        data.append(audio["TIT2"].text[0])
+        song = MP3(path)
+        d = int(song.info.length)
+        minutes = d // 60
+        seconds = d % 60
+        duration = str(minutes) + ":" + str(seconds)
+        data.append(duration)
+        data.append(audio['TPE1'].text[0])
+
+        return data
+
+    # TODO make possible to put id3 data in database.
+
+    def makeCover(self, track_name):
+
         spotify = spotipy.Spotify(
             client_credentials_manager=SpotifyClientCredentials())
-        artist_name = audio['TPE1'].text[0]
-        tr = audio['TIT2'].text[0]
 
         # Gets album art cover by track name.
-        result = spotify.search(q=tr, limit=20)
+        result = spotify.search(q=track_name, limit=20)
         for track in result['tracks']['items']:
             print(track['album']['images'][0]['url'])
             break
-
-        # TODO make possible to put id3 data in database.
 
 
 app = wx.App()
