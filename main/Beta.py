@@ -69,6 +69,8 @@ class Scope(wx.Frame):
         print ("Track: %s" % audio["TIT2"].text[0])
         print ("Release Year: %s" % audio["TDRC"].text[0])
 
+        #TODO make possible to put id3 data in database.
+
 
 app = wx.App()
 frame = Scope(None, -1)
