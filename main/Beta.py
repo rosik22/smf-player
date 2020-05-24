@@ -23,6 +23,8 @@ class Scope(wx.Frame):
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour("Gray")
 
+        
+
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
         open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
