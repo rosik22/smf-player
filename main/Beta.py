@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-#WOGOOO
 
 import wx
 import os
 import sys
 import time
 import sqlite3
+import spotipy
+import os
 from pygame import mixer
-from mutagen.id3 import id3
-from mutagen.mp3 import mp3
+from mutagen.id3 import ID3
+from mutagen.mp3 import MP3
+from spotipy.oauth2 import SpotifyClientCredentials
+
+
+#Export or SET (for win32) the needed variables for the Spotify Web API
+os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
+os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
+os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 
 class Scope(wx.Frame):
@@ -40,7 +48,7 @@ class Scope(wx.Frame):
     def menuhandler(self, event):
         id = event.GetId()
         if id == wx.ID_OPEN:
-            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg)|*.mp3;*.wav;*.aac;*.ogg",
+            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
                 if file.ShowModal() == wx.ID_CANCEL:
@@ -60,19 +68,21 @@ class Scope(wx.Frame):
 
     def loadfile(self, path):
         # TODO implement file load
+        s = 4
 
     def playlistd(self, path):
         # TODO Implement playlist adding to playing now.
+        s = 3
 
     def getMutagenTags(self, path):
 
-        audio = id3(path)
+        audio = ID3(path)
 
-        print ("Artist: %s" % audio['TPE1'].text[0])
-        print ("Track: %s" % audio["TIT2"].text[0])
-        print ("Release Year: %s" % audio["TDRC"].text[0])
+        print("Artist: %s" % audio['TPE1'].text[0])
+        print("Track: %s" % audio["TIT2"].text[0])
+        print("Release Year: %s" % audio["TDRC"].text[0])
 
-        #TODO make possible to put id3 data in database.
+        # TODO make possible to put id3 data in database.
 
 
 app = wx.App()
