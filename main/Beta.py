@@ -5,8 +5,9 @@ import os
 import sys
 import time
 import sqlite3
-from mutagen.mp3 import MP3
 from pygame import mixer
+from mutagen.id3 import id3
+from mutagen.mp3 import mp3
 
 
 class Scope(wx.Frame):
@@ -44,7 +45,7 @@ class Scope(wx.Frame):
 
                 self.pathname = file.GetPath()
                 try:
-                    #TODO Allow the loading of the file
+                    # TODO Allow the loading of the file
 
                     loadfile(self.pathname)
 
@@ -55,10 +56,18 @@ class Scope(wx.Frame):
             self.Close()
 
     def loadfile(self, path):
-        #TODO implement file load
+        # TODO implement file load
 
     def playlistd(self, path):
-        #TODO Implement playlist adding to playing now.
+        # TODO Implement playlist adding to playing now.
+
+    def getMutagenTags(self, path):
+
+        audio = id3(path)
+
+        print ("Artist: %s" % audio['TPE1'].text[0])
+        print ("Track: %s" % audio["TIT2"].text[0])
+        print ("Release Year: %s" % audio["TDRC"].text[0])
 
 
 app = wx.App()
