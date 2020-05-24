@@ -18,6 +18,30 @@ os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
 os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
 os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
+# Make database to store files that are currently being played.
+
+
+def create_connection(db_file):
+    conn = None
+    try:
+        conn = sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        print(e)
+        print("Unable to establish connection to database...\n")
+
+    return conn
+
+
+def insert_into_current(conn, data_field):
+    sql = ''' INSERT or REPLACE INTO playlist(title, duration, artist)
+              VALUES(?,?,?) '''
+    cur = conn.cursor()
+    cur.execute(sql, (data_field[0], data_field[1], data_field[2]))
+
+
+# Currently loaded songs.
+currentpl = 'playing.db'
+
 
 class Scope(wx.Frame):
     def __init__(self, parent, id):
@@ -30,10 +54,12 @@ class Scope(wx.Frame):
         self.SetBackgroundColour("White")
         self.panel = wx.Panel(self, size=(500, 500))
         self.panel.SetBackgroundColour("Black")
-        #Panel for playlist listbox and filter options.
+
+        # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(500, 500))
         self.plbox.SetBackgroundColour("Red")
 
+        #Menubar settings.
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
         open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
@@ -46,12 +72,14 @@ class Scope(wx.Frame):
         self.SetMenuBar(menubar)
         self.Bind(wx.EVT_MENU, self.menuhandler)
 
+        #Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
         self.SetSizer(sizer)
         self.Center()
 
+    #Function to handle menubar options.
     def menuhandler(self, event):
         id = event.GetId()
         ev = event.GetString()
