@@ -26,25 +26,35 @@ class Scope(wx.Frame):
                                                 wx.MAXIMIZE_BOX)
 
         super().__init__(
-            None, title="Scope", style=no_resize, size=(1024, 1024), pos=(0, 0))
+            None, title="Scope", style=no_resize, size=(1000, 1000), pos=(0, 0))
         self.SetBackgroundColour("White")
-        self.panel = wx.Panel(self)
-        self.panel.SetBackgroundColour("Gray")
+        self.panel = wx.Panel(self, size=(500, 500))
+        self.panel.SetBackgroundColour("Black")
+        #Panel for playlist listbox and filter options.
+        self.plbox = wx.Panel(self, size=(500, 500))
+        self.plbox.SetBackgroundColour("Red")
 
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
         open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
         exit = wx.MenuItem(filemenu, wx.ID_CLOSE, '&Exit')
+        add = wx.MenuItem(filemenu, wx.ID_OPEN, '&Add to playlist')
         filemenu.Append(open)
+        filemenu.Append(add)
         filemenu.Append(exit)
         menubar.Append(filemenu, '&File')
         self.SetMenuBar(menubar)
         self.Bind(wx.EVT_MENU, self.menuhandler)
 
-        self.items = wx.BoxSizer(wx.HORIZONTAL)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
+        sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
+        self.SetSizer(sizer)
+        self.Center()
 
     def menuhandler(self, event):
         id = event.GetId()
+        ev = event.GetString()
         if id == wx.ID_OPEN:
             with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
@@ -63,6 +73,23 @@ class Scope(wx.Frame):
 
         if id == wx.ID_CLOSE:
             self.Close()
+
+        if ev == "Add to playlist":
+            # TODO add option to add pathnames to listbox.
+            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
+                               style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
+
+                if file.ShowModal() == wx.ID_CANCEL:
+                    return
+
+                self.pathname = file.GetPath()
+                try:
+                    # TODO Allow the loading of the file
+
+                    return self.pathname
+
+                except IOError:
+                    wx.LogError("Cannot open file '%s'." % newfile)
 
     def loadfile(self, path):
         # TODO implement file load
