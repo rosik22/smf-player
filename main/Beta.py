@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import wx
+import wx.media
 import os
 import sys
 import time
@@ -48,9 +49,9 @@ class Scope(wx.Frame):
 
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
-
         super().__init__(
             None, title="Scope", style=no_resize, size=(1000, 1000), pos=(0, 0))
+
         self.SetBackgroundColour("White")
         self.panel = wx.Panel(self, size=(500, 500))
         self.panel.SetBackgroundColour("Black")
@@ -59,7 +60,14 @@ class Scope(wx.Frame):
         self.plbox = wx.Panel(self, size=(500, 500))
         self.plbox.SetBackgroundColour("Red")
 
-        # Menubar settings.
+        self.createMenu()
+        self.createLayout()
+        self.Buttons()
+
+        self.Center()
+    
+    # Menubar settings.
+    def createMenu(self):
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
         open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
@@ -72,19 +80,29 @@ class Scope(wx.Frame):
         self.SetMenuBar(menubar)
         self.Bind(wx.EVT_MENU, self.menuhandler)
 
+    # Sets the layout
+    def createLayout(self):
+        try:
+            self.Player = wx.media.MediaCtrl(self, style=wx.SIMPLE_BORDER)
+        except NotImplementedError:
+            self.Destroy()
+            raise
+
+        self.PlayerSlider = wx.Slider(self.panel, size=wx.DefaultSize)
+        self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek)
+
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
         self.SetSizer(sizer)
-        self.Center()
 
     # Function to handle menubar options.
     def menuhandler(self, event):
         id = event.GetId()
         ev = event.GetString()
         if id == wx.ID_OPEN:
-            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
+            with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
                 if file.ShowModal() == wx.ID_CANCEL:
@@ -97,7 +115,7 @@ class Scope(wx.Frame):
                     self.loadfile(self.pathname)
                     self.playlistd(self.pathname)
                 except IOError:
-                    wx.LogError("Cannot open file '%s'." % newfile)
+                    wx.LogError("Cannot open file '%s'." % self.pathname)
 
         if id == wx.ID_CLOSE:
             self.Close()
@@ -116,11 +134,18 @@ class Scope(wx.Frame):
                     self.playlistd(self.pathnameforpl)
 
                 except IOError:
-                    wx.LogError("Cannot open file '%s'." % newfile)
+                    wx.LogError("Cannot open file '%s'." % self.pathnameforpl)
 
-    def loadfile(self, path):
+    def loadfile(self, filePath):
         # TODO implement file load
-        s = 4
+        if not self.Player.Load(filePath):
+            wx.MessageBox("Unable to load; File format is not supported.", "ERROR", wx.ICON_ERROR | wx.OK)
+
+    def Buttons(self):
+        picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
+        self.ButtonPlay = wx.BitmapToggleButton(self.panel, label=picPlayBtn, pos=(100,100))
+        self.ButtonPlay.SetInitialSize()
+        self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
 
     def playlistd(self, path):
         # TODO Implement playlist adding to playing now.
@@ -170,6 +195,17 @@ class Scope(wx.Frame):
         for track in result['tracks']['items']:
             print(track['album']['images'][0]['url'])
             break
+
+    def OnPause(self):
+        self.Player.Pause()        
+    
+    def OnPlay(self, event):
+        if not event.GetEventObject().GetValue():
+            self.OnPause()
+        self.Player.Play()
+
+    def OnSeek(self, event):
+        self.Player.Seek(self.PlayerSlider.GetValue())
 
 
 app = wx.App()
