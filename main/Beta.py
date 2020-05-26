@@ -88,7 +88,7 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(self.panel, size=wx.DefaultSize)
+        self.PlayerSlider = wx.Slider(self.panel, size=wx.DefaultSize,)
         self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek)
 
         # Sizer for different panels.
@@ -140,6 +140,8 @@ class Scope(wx.Frame):
         # TODO implement file load
         if not self.Player.Load(filePath):
             wx.MessageBox("Unable to load; File format is not supported.", "ERROR", wx.ICON_ERROR | wx.OK)
+        else:
+            self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def Buttons(self):
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
@@ -202,7 +204,14 @@ class Scope(wx.Frame):
     def OnPlay(self, event):
         if not event.GetEventObject().GetValue():
             self.OnPause()
-        self.Player.Play()
+            return
+
+        if not self.Player.Play():
+            self.ButtonPlay.SetValue(False)
+            wx.MessageBox("A file must be selected.", "ERROR", wx.ICON_ERROR | wx.OK)
+        
+        else:
+            self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def OnSeek(self, event):
         self.Player.Seek(self.PlayerSlider.GetValue())
