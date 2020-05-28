@@ -65,7 +65,7 @@ class Scope(wx.Frame):
         self.Buttons()
 
         self.Center()
-    
+
     # Menubar settings.
     def createMenu(self):
         menubar = wx.MenuBar()
@@ -139,13 +139,15 @@ class Scope(wx.Frame):
     def loadfile(self, filePath):
         # TODO implement file load
         if not self.Player.Load(filePath):
-            wx.MessageBox("Unable to load; File format is not supported.", "ERROR", wx.ICON_ERROR | wx.OK)
+            wx.MessageBox("Unable to load; File format is not supported.",
+                          "ERROR", wx.ICON_ERROR | wx.OK)
         else:
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def Buttons(self):
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
-        self.ButtonPlay = wx.BitmapToggleButton(self.panel, label=picPlayBtn, pos=(100,100))
+        self.ButtonPlay = wx.BitmapToggleButton(
+            self.panel, label=picPlayBtn, pos=(100, 100))
         self.ButtonPlay.SetInitialSize()
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
 
@@ -199,8 +201,8 @@ class Scope(wx.Frame):
             break
 
     def OnPause(self):
-        self.Player.Pause()        
-    
+        self.Player.Pause()
+
     def OnPlay(self, event):
         if not event.GetEventObject().GetValue():
             self.OnPause()
@@ -208,8 +210,9 @@ class Scope(wx.Frame):
 
         if not self.Player.Play():
             self.ButtonPlay.SetValue(False)
-            wx.MessageBox("A file must be selected.", "ERROR", wx.ICON_ERROR | wx.OK)
-        
+            wx.MessageBox("A file must be selected.",
+                          "ERROR", wx.ICON_ERROR | wx.OK)
+
         else:
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
