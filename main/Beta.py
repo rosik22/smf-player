@@ -11,6 +11,7 @@ import os
 from pygame import mixer
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
+from mutagen import File as MutaFile
 from spotipy.oauth2 import SpotifyClientCredentials
 
 
@@ -50,14 +51,15 @@ class Scope(wx.Frame):
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Scope", style=no_resize, size=(1000, 1000), pos=(0, 0))
+            None, title="Scope", style=no_resize, size=(600, 800), pos=(0, 0))
 
         self.SetBackgroundColour("White")
-        self.panel = wx.Panel(self, size=(500, 500))
+        self.panel = wx.Panel(self, size=(500, 200))
         self.panel.SetBackgroundColour("Black")
 
         # Panel for playlist listbox and filter options.
-        self.plbox = wx.Panel(self, size=(500, 500))
+        self.plbox = wx.Panel(self, size=(500, 600))
+        self.playlist = wx.ListBox(self.plbox, size=(500,450), pos=(50,50))
         self.plbox.SetBackgroundColour("Red")
 
         self.createMenu()
@@ -111,16 +113,16 @@ class Scope(wx.Frame):
                 self.pathname = file.GetPath()
                 try:
                     # TODO Allow the loading of the file
-
                     self.loadfile(self.pathname)
-                    self.playlistd(self.pathname)
+                    self.getMutagenTags(self.pathname)
+                   # self.playlistd(self.pathname)
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % self.pathname)
 
         if id == wx.ID_CLOSE:
             self.Close()
 
-        if ev == "Add to playlist":
+        """ if ev == "Add to playlist":
             # TODO add option to add pathnames to listbox.
             with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
@@ -134,7 +136,7 @@ class Scope(wx.Frame):
                     self.playlistd(self.pathnameforpl)
 
                 except IOError:
-                    wx.LogError("Cannot open file '%s'." % self.pathnameforpl)
+                    wx.LogError("Cannot open file '%s'." % self.pathnameforpl) """
 
     def loadfile(self, filePath):
         # TODO implement file load
@@ -163,12 +165,13 @@ class Scope(wx.Frame):
         insert_into_current(self.curr_pl, song_data)
 
     def getMutagenTags(self, path):
-
         audio = ID3(path)
-
-        print("Artist: %s" % audio['TPE1'].text[0])
-        print("Track: %s" % audio["TIT2"].text[0])
-        print("Release Year: %s" % audio["TDRC"].text[0])
+        song = MutaFile(path)
+        print(int(song.info.length))
+        
+        """ print(audio['TPE1'].text[0])
+        print(audio["TIT2"].text[0]) 
+        print(audio["TDRC"].text[0]) """
 
         self.makeCover(audio['TIT2'].text[0])
         data = []
