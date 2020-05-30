@@ -6,20 +6,16 @@ import os
 import sys
 import time
 import sqlite3
-import spotipy
 import acoustid
 import urllib.request
+import urllib.parse
 import json
 from mutagen.id3 import ID3
-from mutagen.mp3 import MP3
 from mutagen import File as MutaFile
 from spotipy.oauth2 import SpotifyClientCredentials
 from acoustid import fingerprint_file
-
-# Export or SET (for win32) the needed variables for the Spotify Web API
-os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
-os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
-os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
+from xml.dom.minidom import parseString
+from PIL import Image
 
 # Currently loaded songs.
 currentpl = 'playing.db'
@@ -36,12 +32,23 @@ class Scope(wx.Frame):
         self.establishConnection()
 
         self.SetBackgroundColour("White")
+
+        # Playback panel
         self.panel = wx.Panel(self, size=(500, 200))
         self.panel.SetBackgroundColour("Black")
 
+        # Panel for album cover
+        self.display = wx.Panel(self, size=(200, 200))
+        self.display.SetBackgroundColour("Black")
+        self.disp = wx.StaticBitmap(
+            self.display, size=(200, 200), pos=(200, 0))
+        self.artist_name = ''
+        self.song_name = ''
+
         # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(500, 600))
-        self.playlistBox = wx.ListBox(self.plbox, size=(500, 450), pos=(50, 50))
+        self.playlistBox = wx.ListBox(
+            self.plbox, size=(500, 450), pos=(50, 50))
         self.Bind(wx.EVT_LISTBOX, self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("White")
 
@@ -51,6 +58,7 @@ class Scope(wx.Frame):
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
         self.Center()
+
 #-----------------------------------------------------------------------------------------------------------------------#
     def OnClose(self, e):
         self.conn.close()
@@ -88,6 +96,7 @@ class Scope(wx.Frame):
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
+                    self.makeCover(self.song_name, self.artist_name)
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -124,6 +133,7 @@ class Scope(wx.Frame):
 
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.display, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
         self.SetSizer(sizer)
@@ -131,12 +141,14 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
         selection = e.GetString()
-        fhalf,shalf = selection.split(" - ")
+        fhalf, shalf = selection.split(" - ")
 
-        self.curs.execute('''SELECT path FROM playlist WHERE artist=? AND title=? ''', (fhalf,shalf))
+        self.curs.execute(
+            '''SELECT path FROM playlist WHERE artist=? AND title=? ''', (fhalf, shalf))
         path = ''.join(self.curs.fetchone())
-        
+
         self.Player.Load(path)
+        self.makeCover(shalf, fhalf)
         self.Player.Play()
         self.ButtonPlay.SetValue(True)
 
@@ -157,8 +169,10 @@ class Scope(wx.Frame):
         print(audio['TPE1'].text[0])  # artist
         print(audio["TIT2"].text[0])  # title
         print(audio["TDRC"].text[0])  # year
-       # self.makeCover(audio['TIT2'].text[0])
+        # self.makeCover(audio['TIT2'].text[0])
         data = []
+        self.artist_name = audio['TPE1'].text[0]
+        self.song_name = audio['TIT2'].text[0]
 
         # Insert song data in list for inserting in database of currently playing songs.
 
@@ -170,6 +184,11 @@ class Scope(wx.Frame):
         data.append(duration)
         data.append(audio['TPE1'].text[0])
         data.append(str(audio["TDRC"].text[0]))
+        data.append(path)
+        self.playlistd(data)
+        self.fillPlaylistBox(data)
+
+        # Use acoustid API to get song data if ID3 tags are not available.
         fing = fingerprint_file(path, force_fpcalc=True)
         fing = fing[1]
         fing = str(fing)
@@ -179,54 +198,11 @@ class Scope(wx.Frame):
         url += '&fingerprint='
         url += fing
         text = urllib.request.urlopen(url)
-
-        def deep_search(needles, haystack):
-            found = {}
-            if type(needles) != type([]):
-                needles = [needles]
-
-            if type(haystack) == type(dict()):
-                for needle in needles:
-                    if needle in haystack.keys():
-                        found[needle] = haystack[needle]
-                    elif len(haystack.keys()) > 0:
-                        for key in haystack.keys():
-                            result = deep_search(needle, haystack[key])
-                            if result:
-                                for k, v in result.items():
-                                    found[k] = v
-            elif type(haystack) == type([]):
-                for node in haystack:
-                    result = deep_search(needles, node)
-                    if result:
-                        for k, v in result.items():
-                            found[k] = v
-            return found
-
-
-        print(deep_search(["name", "title"], json.load(text)))
-
-        # print(parsed)
-        # print(parsed['results'][0]['recordings'][0]['artists'][0]['name'])
-        # print(parsed['results'][0]['recordings']
-        #      [0]['releasegroups'][0]['title'])
-        # print(parsed['results'][0]['recordings'][0]['title'])
-        """ try:
-            artist = parsed['results'][0]['recordings'][0]['artists'][0]['name']
-            album = parsed['results'][0]['recordings'][0]['releasegroups'][0]['title']
-            track = parsed['results'][0]['recordings'][0]['title']
-        except:
-            artist = parsed['results'][0]['recordings'][1]['artists'][0]['name']
-            album = parsed['results'][0]['recordings'][1]['releasegroups'][0]['title']
-            track = parsed['results'][0]['recordings'][1]['title'] """
-        data.append(path)
-        self.playlistd(data)
-        self.fillPlaylistBox(data)
-
-    # TODO make possible to put id3 data in database.
+        parsed = json.loads(text.read())
+        print(list(acoustid.parse_lookup_result(parsed)))
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def fillPlaylistBox(self,data):
+    def fillPlaylistBox(self, data):
         dataStr = str(data[2] + " - " + str(data[0]))
         self.playlistBox.Append(dataStr)
 
@@ -256,22 +232,44 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def playlistd(self, data):
         self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path) 
-                    VALUES(?,?,?,?,?)''', (data[0],data[1],data[2],data[3],data[4]))
+                    VALUES(?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4]))
         self.conn.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def makeCover(self, track_name):
+    def makeCover(self, track_name, artist_name):
 
-        spotify = spotipy.Spotify(
-            client_credentials_manager=SpotifyClientCredentials())
-
-        # Gets album art cover by track name.
-        result = spotify.search(q=track_name, limit=20)
-        for track in result['tracks']['items']:
-            print(track['album']['images'][0]['url'])
-            break
+        url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
+        url += urllib.parse.quote(artist_name) + \
+            '&track=' + urllib.parse.quote(track_name)
+        link = urllib.request.urlopen(url)
+        parsed = json.load(link)
+        imagelinks = parsed['track']['album']['image']
+        print(imagelinks)
+        imagelink = imagelinks[3]['#text']
+        filename = urllib.request.urlopen(imagelink)
+        self.displayimage(filename)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    def displayimage(self, path):
+        self.pilimage = Image.open(path)
+        self.width, self.height = self.pilimage.size
+        self.pilimage.thumbnail((200, 200))
+        self.PilImageToWxImage(self.pilimage)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def PilImageToWxImage(self, img):
+
+        myWxImage = wx.Image(img.size[0], img.size[1])
+
+        dataRGB = img.convert(
+            'RGB').tobytes()
+        myWxImage.SetData(dataRGB)
+        if myWxImage.HasAlpha():
+            dataRGBA = img.tobytes()[3::4]
+            myWxImage.SetAlphaData(dataRGBA)
+        self.disp.SetBitmap(wx.Bitmap(myWxImage))
+
+        #-----------------------------------------------------------------------------------------------------------------------#
     def OnPause(self):
         self.Player.Pause()
 
