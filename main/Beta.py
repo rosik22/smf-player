@@ -162,31 +162,7 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def getMutagenTags(self, path):
-        audio = ID3(path)
-        song = MutaFile(path)
-        d = int(song.info.length)
-
-        print(audio['TPE1'].text[0])  # artist
-        print(audio["TIT2"].text[0])  # title
-        print(audio["TDRC"].text[0])  # year
-        # self.makeCover(audio['TIT2'].text[0])
         data = []
-        self.artist_name = audio['TPE1'].text[0]
-        self.song_name = audio['TIT2'].text[0]
-
-        # Insert song data in list for inserting in database of currently playing songs.
-
-        minutes = d // 60
-        seconds = d % 60
-        duration = str(minutes) + ":" + str(seconds)
-
-        data.append(audio["TIT2"].text[0])
-        data.append(duration)
-        data.append(audio['TPE1'].text[0])
-        data.append(str(audio["TDRC"].text[0]))
-        data.append(path)
-        self.playlistd(data)
-        self.fillPlaylistBox(data)
 
         # Use acoustid API to get song data if ID3 tags are not available.
         fing = fingerprint_file(path, force_fpcalc=True)
@@ -199,7 +175,45 @@ class Scope(wx.Frame):
         url += fing
         text = urllib.request.urlopen(url)
         parsed = json.loads(text.read())
-        print(list(acoustid.parse_lookup_result(parsed)))
+        names = list(acoustid.parse_lookup_result(parsed))
+        for x in names:
+            if None not in x:
+                names = x
+                break
+        title = names[-2]
+        artist = names[-1]
+
+        # Check if file has ID3 tags. If not, use the LastFM API for naming.
+        try:
+            audio = ID3(path)
+            self.artist_name = audio['TPE1'].text[0]
+            self.song_name = audio['TIT2'].text[0]
+            song_year = audio['TDRC'].text[0]
+        except:
+            self.artist_name = artist
+            self.song_name = title
+            song_year = ''
+
+        song = MutaFile(path)
+        d = int(song.info.length)
+
+        # print(audio['TPE1'].text[0])  # artist
+        # print(audio["TIT2"].text[0])  # title
+        # print(audio["TDRC"].text[0])  # year
+        # self.makeCover(audio['TIT2'].text[0])
+        # Insert song data in list for inserting in database of currently playing songs.
+
+        minutes = d // 60
+        seconds = d % 60
+        duration = str(minutes) + ":" + str(seconds)
+
+        data.append(self.song_name)
+        data.append(duration)
+        data.append(self.artist_name)
+        data.append(song_year)
+        data.append(path)
+        self.playlistd(data)
+        self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
@@ -244,7 +258,6 @@ class Scope(wx.Frame):
         link = urllib.request.urlopen(url)
         parsed = json.load(link)
         imagelinks = parsed['track']['album']['image']
-        print(imagelinks)
         imagelink = imagelinks[3]['#text']
         filename = urllib.request.urlopen(imagelink)
         self.displayimage(filename)
