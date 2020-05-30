@@ -7,10 +7,6 @@ import sys
 import time
 import sqlite3
 import spotipy
-<<<<<<< HEAD
-=======
-import os
->>>>>>> dev1
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
 from mutagen import File as MutaFile
