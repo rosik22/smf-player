@@ -7,6 +7,7 @@ import sys
 import time
 import sqlite3
 import spotipy
+from functools import partial
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
 from mutagen import File as MutaFile
@@ -36,8 +37,11 @@ class Scope(wx.Frame):
 
         # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(500, 600))
-        self.playlistBox = wx.ListBox(self.plbox, size=(500, 450), pos=(50, 50))
-        self.Bind(wx.EVT_LISTBOX, self.loadSongFromListBox)
+        self.playlistBox = wx.ListCtrl(self.plbox, size=(500, 450), pos=(50, 50), style=wx.LC_REPORT)
+        self.playlistBox.AppendColumn("Artist", width=200)
+        self.playlistBox.AppendColumn("Title", width=200)
+        self.playlistBox.AppendColumn("Duration", width=100)
+        self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED, self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("White")
 
         self.createMenu()
@@ -56,22 +60,20 @@ class Scope(wx.Frame):
     def createMenu(self):
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
-        open = wx.MenuItem(filemenu, wx.ID_OPEN, '&Open')
-        exit = wx.MenuItem(filemenu, wx.ID_CLOSE, '&Exit')
-        add = wx.MenuItem(filemenu, wx.ID_OPEN, '&Add to playlist')
-        filemenu.Append(open)
-        filemenu.Append(add)
-        filemenu.Append(exit)
+        open1 = filemenu.Append(-1, "&Open")
+        add = filemenu.Append(-1, "&Add to playlist")
+        exit2 = filemenu.Append(-1, "&Exit")
         menubar.Append(filemenu, '&File')
         self.SetMenuBar(menubar)
-        self.Bind(wx.EVT_MENU, self.menuhandler)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 1), open1)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 2), add)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 3), exit2)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
-    def menuhandler(self, event):
+    def menuhandler(self,num ,event):
         id = event.GetId()
-        ev = event.GetString()
-        if id == wx.ID_OPEN:
+        if num == 1:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
@@ -79,6 +81,25 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
+                
+                try:
+                    self.curs.execute('DELETE FROM playlist;')
+                    self.conn.commit()
+                    self.playlistBox.DeleteAllItems()
+                    self.Player.Load(pathname)
+                    self.getMutagenTags(pathname)
+                except IOError:
+                    wx.LogError("Cannot open file '%s'." % pathname)
+
+        elif num == 2:
+            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
+                               style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
+
+                if file.ShowModal() == wx.ID_CANCEL:
+                    return
+
+                pathname = file.GetPath()
+                
                 try:
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
@@ -86,24 +107,8 @@ class Scope(wx.Frame):
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
-        if id == wx.ID_CLOSE:
+        elif num == 3:
             self.Close()
-
-        """ if ev == "Add to playlist":
-            # TODO add option to add pathnames to listbox.
-            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
-                               style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
-
-                if file.ShowModal() == wx.ID_CANCEL:
-                    return
-
-                self.pathnameforpl = file.GetPath()
-                try:
-                    # TODO Allow the loading of the file
-                    self.playlistd(self.pathnameforpl)
-
-                except IOError:
-                    wx.LogError("Cannot open file '%s'." % self.pathnameforpl) """
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Sets the layout
@@ -125,10 +130,18 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
-        selection = e.GetString()
-        fhalf,shalf = selection.split(" - ")
+        d = []
+        row = e.GetEventObject().GetFocusedItem()
+        count = self.playlistBox.GetItemCount()
+        cols = self.playlistBox.GetColumnCount()
+        for col in range(cols-1):
+            item = self.playlistBox.GetItem(itemIdx=row, col=col)
+            d.append(item.GetText())
 
-        self.curs.execute('''SELECT path FROM playlist WHERE artist=? AND title=? ''', (fhalf,shalf))
+        artistName = str(d[0])
+        songTitle = str(d[1])
+
+        self.curs.execute('''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName,songTitle))
         path = ''.join(self.curs.fetchone())
         
         self.Player.Load(path)
@@ -148,33 +161,28 @@ class Scope(wx.Frame):
         audio = ID3(path)
         song = MutaFile(path)
         d = int(song.info.length)
-
-        print(audio['TPE1'].text[0])  # artist
-        print(audio["TIT2"].text[0])  # title
-        print(audio["TDRC"].text[0])  # year
-       # self.makeCover(audio['TIT2'].text[0])
         data = []
 
         # Insert song data in list for inserting in database of currently playing songs.
-
         minutes = d // 60
         seconds = d % 60
         duration = str(minutes) + ":" + str(seconds)
 
-        data.append(audio["TIT2"].text[0])
+        data.append(audio["TIT2"].text[0]) #title
         data.append(duration)
-        data.append(audio['TPE1'].text[0])
-        data.append(str(audio["TDRC"].text[0]))
+        data.append(audio['TPE1'].text[0]) #artist
+        data.append(str(audio["TDRC"].text[0])) #year
         data.append(path)
+
         self.playlistd(data)
         self.fillPlaylistBox(data)
 
-    # TODO make possible to put id3 data in database.
-
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self,data):
-        dataStr = str(data[2] + " - " + str(data[0]))
-        self.playlistBox.Append(dataStr)
+        list1 = (data[2],data[0],data[1])
+        self.playlistBox.InsertItem(0, list1[0])
+        self.playlistBox.SetItem(0, 1, str(list1[1]))
+        self.playlistBox.SetItem(0, 2, str(list1[2]))
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def establishConnection(self):
