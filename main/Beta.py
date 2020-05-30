@@ -8,7 +8,6 @@ import time
 import sqlite3
 import spotipy
 import os
-from pygame import mixer
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
 from mutagen import File as MutaFile
@@ -20,30 +19,8 @@ os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
 os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
 os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
-# Make database to store files that are currently being played.
-
-
-def create_connection(db_file):
-    conn = None
-    try:
-        conn = sqlite3.connect(db_file)
-    except sqlite3.Error as e:
-        print(e)
-        print("Unable to establish connection to database...\n")
-
-    return conn
-
-
-def insert_into_current(conn, data_field):
-    sql = ''' INSERT or REPLACE INTO playlist(title, duration, artist)
-              VALUES(?,?,?) '''
-    cur = conn.cursor()
-    cur.execute(sql, (data_field[0], data_field[1], data_field[2]))
-
-
 # Currently loaded songs.
 currentpl = 'playing.db'
-
 
 class Scope(wx.Frame):
     def __init__(self, parent, id):
@@ -59,7 +36,7 @@ class Scope(wx.Frame):
 
         # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(500, 600))
-        self.playlist = wx.ListBox(self.plbox, size=(500,450), pos=(50,50))
+        self.playlist = wx.ListBox(self.plbox, size=(500, 450), pos=(50, 50))
         self.plbox.SetBackgroundColour("Red")
 
         self.createMenu()
@@ -67,7 +44,7 @@ class Scope(wx.Frame):
         self.Buttons()
 
         self.Center()
-    
+
     # Menubar settings.
     def createMenu(self):
         menubar = wx.MenuBar()
@@ -141,54 +118,63 @@ class Scope(wx.Frame):
     def loadfile(self, filePath):
         # TODO implement file load
         if not self.Player.Load(filePath):
-            wx.MessageBox("Unable to load; File format is not supported.", "ERROR", wx.ICON_ERROR | wx.OK)
+            wx.MessageBox("Unable to load; File format is not supported.",
+                          "ERROR", wx.ICON_ERROR | wx.OK)
         else:
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def Buttons(self):
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
-        self.ButtonPlay = wx.BitmapToggleButton(self.panel, label=picPlayBtn, pos=(100,100))
+        self.ButtonPlay = wx.BitmapToggleButton(
+            self.panel, label=picPlayBtn, pos=(100, 100))
         self.ButtonPlay.SetInitialSize()
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
-
-    def playlistd(self, path):
-        # TODO Implement playlist adding to playing now.
-        self.curr_pl = create_connection(currentpl)
-        self.curr_pl.execute('''CREATE TABLE IF NOT EXISTS playlist
-        (title VARCHAR(255) UNIQUE,
-        duration VARCHAR(255),
-        artist VARCHAR(255))''')
-
-        self.curr_pl.commit()
-        song_data = []
-        song_data = self.getMutagenTags(path)
-        insert_into_current(self.curr_pl, song_data)
 
     def getMutagenTags(self, path):
         audio = ID3(path)
         song = MutaFile(path)
-        print(int(song.info.length))
-        
-        """ print(audio['TPE1'].text[0])
-        print(audio["TIT2"].text[0]) 
-        print(audio["TDRC"].text[0]) """
+        d = int(song.info.length)
 
-        self.makeCover(audio['TIT2'].text[0])
+        print(audio['TPE1'].text[0])  # artist
+        print(audio["TIT2"].text[0])  # title
+        print(audio["TDRC"].text[0])  # year
+       # self.makeCover(audio['TIT2'].text[0])
         data = []
 
         # Insert song data in list for inserting in database of currently playing songs.
-        data.append(audio["TIT2"].text[0])
-        song = MP3(path)
-        d = int(song.info.length)
+
         minutes = d // 60
         seconds = d % 60
         duration = str(minutes) + ":" + str(seconds)
+
+        data.append(audio["TIT2"].text[0])
         data.append(duration)
         data.append(audio['TPE1'].text[0])
-
-        return data
+        data.append(str(audio["TDRC"].text[0]))
+        self.playlistd(data)
 
     # TODO make possible to put id3 data in database.
+
+    def playlistd(self, data):
+        # TODO Implement playlist adding to playing now.
+        self.conn = None
+        try:
+            self.conn = sqlite3.connect(currentpl)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
+
+        self.curs = self.conn.cursor()
+        self.curs.execute('''CREATE TABLE IF NOT EXISTS playlist
+                            (title VARCHAR(255) UNIQUE,
+                            duration VARCHAR(255),
+                            artist VARCHAR(255),
+                            year VARCHAR(255))''')
+
+        self.conn.commit()
+        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year) 
+                    VALUES(?,?,?,?)''', (data[0],data[1],data[2],data[3]))
+        self.conn.commit()
 
     def makeCover(self, track_name):
 
@@ -202,8 +188,8 @@ class Scope(wx.Frame):
             break
 
     def OnPause(self):
-        self.Player.Pause()        
-    
+        self.Player.Pause()
+
     def OnPlay(self, event):
         if not event.GetEventObject().GetValue():
             self.OnPause()
@@ -211,8 +197,9 @@ class Scope(wx.Frame):
 
         if not self.Player.Play():
             self.ButtonPlay.SetValue(False)
-            wx.MessageBox("A file must be selected.", "ERROR", wx.ICON_ERROR | wx.OK)
-        
+            wx.MessageBox("A file must be selected.",
+                          "ERROR", wx.ICON_ERROR | wx.OK)
+
         else:
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
