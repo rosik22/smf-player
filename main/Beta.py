@@ -7,8 +7,6 @@ import sys
 import time
 import sqlite3
 import spotipy
-import os
-from pygame import mixer
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
 from spotipy.oauth2 import SpotifyClientCredentials
