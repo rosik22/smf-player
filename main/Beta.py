@@ -7,10 +7,14 @@ import sys
 import time
 import sqlite3
 import spotipy
+import acoustid
+import urllib.request
+import json
 from mutagen.id3 import ID3
 from mutagen.mp3 import MP3
 from mutagen import File as MutaFile
 from spotipy.oauth2 import SpotifyClientCredentials
+from acoustid import fingerprint_file
 
 
 # Export or SET (for win32) the needed variables for the Spotify Web API
@@ -20,6 +24,7 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 # Currently loaded songs.
 currentpl = 'playing.db'
+
 
 class Scope(wx.Frame):
     def __init__(self, parent, id):
@@ -150,6 +155,55 @@ class Scope(wx.Frame):
         data.append(duration)
         data.append(audio['TPE1'].text[0])
         data.append(str(audio["TDRC"].text[0]))
+        fing = fingerprint_file(path, force_fpcalc=True)
+        fing = fing[1]
+        fing = str(fing)
+        fing = fing[2:-1]
+        url = 'https://api.acoustid.org/v2/lookup?client=Bklmy2zJQL&meta=recordings+releasegroups+compress&duration='
+        url += str(d)
+        url += '&fingerprint='
+        url += fing
+        text = urllib.request.urlopen(url)
+
+        def deep_search(needles, haystack):
+            found = {}
+            if type(needles) != type([]):
+                needles = [needles]
+
+            if type(haystack) == type(dict()):
+                for needle in needles:
+                    if needle in haystack.keys():
+                        found[needle] = haystack[needle]
+                    elif len(haystack.keys()) > 0:
+                        for key in haystack.keys():
+                            result = deep_search(needle, haystack[key])
+                            if result:
+                                for k, v in result.items():
+                                    found[k] = v
+            elif type(haystack) == type([]):
+                for node in haystack:
+                    result = deep_search(needles, node)
+                    if result:
+                        for k, v in result.items():
+                            found[k] = v
+            return found
+
+
+        print(deep_search(["name", "title"], json.load(text)))
+
+        # print(parsed)
+        # print(parsed['results'][0]['recordings'][0]['artists'][0]['name'])
+        # print(parsed['results'][0]['recordings']
+        #      [0]['releasegroups'][0]['title'])
+        # print(parsed['results'][0]['recordings'][0]['title'])
+        """ try:
+            artist = parsed['results'][0]['recordings'][0]['artists'][0]['name']
+            album = parsed['results'][0]['recordings'][0]['releasegroups'][0]['title']
+            track = parsed['results'][0]['recordings'][0]['title']
+        except:
+            artist = parsed['results'][0]['recordings'][1]['artists'][0]['name']
+            album = parsed['results'][0]['recordings'][1]['releasegroups'][0]['title']
+            track = parsed['results'][0]['recordings'][1]['title'] """
         self.playlistd(data)
 
     # TODO make possible to put id3 data in database.
@@ -172,7 +226,7 @@ class Scope(wx.Frame):
 
         self.conn.commit()
         self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year) 
-                    VALUES(?,?,?,?)''', (data[0],data[1],data[2],data[3]))
+                    VALUES(?,?,?,?)''', (data[0], data[1], data[2], data[3]))
         self.conn.commit()
 
     def makeCover(self, track_name):
