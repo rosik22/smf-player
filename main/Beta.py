@@ -28,14 +28,14 @@ class Scope(wx.Frame):
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Scope", style=no_resize, size=(600, 800), pos=(0, 0))
+            None, title="Scope", style=no_resize, size=(600, 850), pos=(0, 0))
 
         self.establishConnection()
 
-        self.SetBackgroundColour("White")
+        self.SetBackgroundColour("Black")
 
         # Playback panel
-        self.panel = wx.Panel(self, size=(500, 200))
+        self.panel = wx.Panel(self, size=(600, 100))
         self.panel.SetBackgroundColour("Black")
 
         # Panel for album cover
@@ -47,13 +47,17 @@ class Scope(wx.Frame):
         self.song_name = ''
 
         # Panel for playlist listbox and filter options.
-        self.plbox = wx.Panel(self, size=(500, 600))
-        self.playlistBox = wx.ListCtrl(self.plbox, size=(500, 450), pos=(50, 50), style=wx.LC_REPORT)
+        self.plbox = wx.Panel(self, size=(600, 550))
+        self.playlistBox = wx.ListCtrl(self.plbox, size=(550, 425), pos=(25, 25), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=200)
         self.playlistBox.AppendColumn("Title", width=200)
         self.playlistBox.AppendColumn("Duration", width=100)
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED, self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("White")
+
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onTimer)
+        self.timer.Start(100)
 
         self.createMenu()
         self.createLayout()
@@ -101,6 +105,7 @@ class Scope(wx.Frame):
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
                     self.makeCover(self.song_name, self.artist_name)
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -117,6 +122,7 @@ class Scope(wx.Frame):
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -132,8 +138,8 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(self.panel, size=wx.DefaultSize,)
-        self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek)
+        self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
+        self.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
 
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -159,15 +165,24 @@ class Scope(wx.Frame):
         path = ''.join(self.curs.fetchone())
 
         self.Player.Load(path)
+        self.PlayerSlider.SetRange(0, self.Player.Length())
         self.makeCover(songTitle, artistName)
         self.Player.Play()
         self.ButtonPlay.SetValue(True)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    def scaleBitmap(self, bitmap):
+        image = bitmap.ConvertToImage()
+        image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
+        result = wx.Bitmap(image)
+        return result
+
+#-----------------------------------------------------------------------------------------------------------------------#
     def Buttons(self):
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
+        picPlayBtn = self.scaleBitmap(picPlayBtn)
         self.ButtonPlay = wx.BitmapToggleButton(
-            self.panel, label=picPlayBtn, pos=(100, 100))
+            self.panel, label=picPlayBtn, pos=(275, 40))
         self.ButtonPlay.SetInitialSize()
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
 
@@ -291,7 +306,7 @@ class Scope(wx.Frame):
             myWxImage.SetAlphaData(dataRGBA)
         self.disp.SetBitmap(wx.Bitmap(myWxImage))
 
-        #-----------------------------------------------------------------------------------------------------------------------#
+#-----------------------------------------------------------------------------------------------------------------------#
     def OnPause(self):
         self.Player.Pause()
 
@@ -309,7 +324,12 @@ class Scope(wx.Frame):
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def OnSeek(self, event):
-        self.Player.Seek(self.PlayerSlider.GetValue())
+        value = self.PlayerSlider.GetValue()
+        self.Player.Seek(value)
+
+    def onTimer(self, event):
+        value = self.Player.Tell()
+        self.PlayerSlider.SetValue(value)
 
 
 app = wx.App()
