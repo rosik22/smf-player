@@ -181,9 +181,22 @@ class Scope(wx.Frame):
     def Buttons(self):
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
         picPlayBtn = self.scaleBitmap(picPlayBtn)
+
+        picPrevBtn = wx.Bitmap("previous-song-button.png", wx.BITMAP_TYPE_ANY)
+        picPrevBtn = self.scaleBitmap(picPrevBtn)
+
+        picNextBtn = wx.Bitmap("next-song-button.png", wx.BITMAP_TYPE_ANY)
+        picNextBtn = self.scaleBitmap(picNextBtn)
+
         self.ButtonPlay = wx.BitmapToggleButton(
             self.panel, label=picPlayBtn, pos=(275, 40))
-        self.ButtonPlay.SetInitialSize()
+
+        self.ButtonPrev = wx.BitmapToggleButton(
+            self.panel, label=picPrevBtn, pos=(210,40))
+
+        self.ButtonBtn = wx.BitmapToggleButton(
+            self.panel, label=picNextBtn, pos=(340,40))
+
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
 
 #-----------------------------------------------------------------------------------------------------------------------#
