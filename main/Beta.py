@@ -28,14 +28,14 @@ class Scope(wx.Frame):
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Scope", style=no_resize, size=(600, 800), pos=(0, 0))
+            None, title="Scope", style=no_resize, size=(600, 850), pos=(0, 0))
 
         self.establishConnection()
 
-        self.SetBackgroundColour("White")
+        self.SetBackgroundColour("Black")
 
         # Playback panel
-        self.panel = wx.Panel(self, size=(500, 200))
+        self.panel = wx.Panel(self, size=(600, 100))
         self.panel.SetBackgroundColour("Black")
 
         # Panel for album cover
@@ -47,15 +47,17 @@ class Scope(wx.Frame):
         self.song_name = ''
 
         # Panel for playlist listbox and filter options.
-        self.plbox = wx.Panel(self, size=(500, 600))
-        self.playlistBox = wx.ListCtrl(self.plbox, size=(
-            500, 450), pos=(50, 50), style=wx.LC_REPORT)
+        self.plbox = wx.Panel(self, size=(600, 550))
+        self.playlistBox = wx.ListCtrl(self.plbox, size=(550, 425), pos=(25, 25), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=200)
         self.playlistBox.AppendColumn("Title", width=200)
         self.playlistBox.AppendColumn("Duration", width=100)
-        self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
-                              self.loadSongFromListBox)
+        self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED, self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("White")
+
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onTimer)
+        self.timer.Start(100)
 
         self.createMenu()
         self.createLayout()
@@ -85,7 +87,7 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
-    def menuhandler(self, num, event):
+    def menuhandler(self,num ,event):
         id = event.GetId()
         if num == 1:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
@@ -95,7 +97,7 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
-
+                
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
@@ -103,6 +105,7 @@ class Scope(wx.Frame):
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
                     self.makeCover(self.song_name, self.artist_name)
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -114,11 +117,12 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
-
+                
                 try:
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
@@ -134,8 +138,8 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(self.panel, size=wx.DefaultSize,)
-        self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek)
+        self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
+        self.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
 
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -157,14 +161,21 @@ class Scope(wx.Frame):
         artistName = str(d[0])
         songTitle = str(d[1])
 
-        self.curs.execute(
-            '''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName, songTitle))
+        self.curs.execute('''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName,songTitle))
         path = ''.join(self.curs.fetchone())
 
         self.Player.Load(path)
+        self.PlayerSlider.SetRange(0, self.Player.Length())
         self.makeCover(songTitle, artistName)
         self.Player.Play()
         self.ButtonPlay.SetValue(True)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def scaleBitmap(self, bitmap):
+        image = bitmap.ConvertToImage()
+        image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
+        result = wx.Bitmap(image)
+        return result
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def Buttons(self):
@@ -213,7 +224,7 @@ class Scope(wx.Frame):
         print(names)
         title = names[-2]
         artist = names[-1]
-
+        
         # Check if file has ID3 tags. If not, use the LastFM API for naming.
         try:
             audio = ID3(path)
@@ -240,8 +251,8 @@ class Scope(wx.Frame):
         self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def fillPlaylistBox(self, data):
-        list1 = (data[2], data[0], data[1])
+    def fillPlaylistBox(self,data):
+        list1 = (data[2],data[0],data[1])
         self.playlistBox.InsertItem(0, list1[0])
         self.playlistBox.SetItem(0, 1, str(list1[1]))
         self.playlistBox.SetItem(0, 2, str(list1[2]))
@@ -308,7 +319,7 @@ class Scope(wx.Frame):
             myWxImage.SetAlphaData(dataRGBA)
         self.disp.SetBitmap(wx.Bitmap(myWxImage))
 
-        #-----------------------------------------------------------------------------------------------------------------------#
+#-----------------------------------------------------------------------------------------------------------------------#
     def OnPause(self):
         self.Player.Pause()
 
@@ -326,7 +337,12 @@ class Scope(wx.Frame):
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def OnSeek(self, event):
-        self.Player.Seek(self.PlayerSlider.GetValue())
+        value = self.PlayerSlider.GetValue()
+        self.Player.Seek(value)
+
+    def onTimer(self, event):
+        value = self.Player.Tell()
+        self.PlayerSlider.SetValue(value)
 
 
 app = wx.App()
