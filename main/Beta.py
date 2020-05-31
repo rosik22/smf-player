@@ -6,7 +6,6 @@ import os
 import sys
 import time
 import sqlite3
-from functools import partial
 import acoustid
 import urllib.request
 import urllib.parse
@@ -17,6 +16,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 from acoustid import fingerprint_file
 from xml.dom.minidom import parseString
 from PIL import Image
+from functools import partial
 
 # Currently loaded songs.
 currentpl = 'playing.db'
