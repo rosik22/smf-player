@@ -10,6 +10,8 @@ import acoustid
 import urllib.request
 import urllib.parse
 import json
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 from mutagen.id3 import ID3
 from mutagen import File as MutaFile
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -17,6 +19,11 @@ from acoustid import fingerprint_file
 from xml.dom.minidom import parseString
 from PIL import Image
 from functools import partial
+from io import BytesIO
+
+os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
+os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
+os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 # Currently loaded songs.
 currentpl = 'playing.db'
@@ -48,11 +55,13 @@ class Scope(wx.Frame):
 
         # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(600, 550))
-        self.playlistBox = wx.ListCtrl(self.plbox, size=(550, 425), pos=(25, 25), style=wx.LC_REPORT)
+        self.playlistBox = wx.ListCtrl(self.plbox, size=(
+            550, 425), pos=(25, 25), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=200)
         self.playlistBox.AppendColumn("Title", width=200)
         self.playlistBox.AppendColumn("Duration", width=100)
-        self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED, self.loadSongFromListBox)
+        self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
+                              self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("White")
 
         self.timer = wx.Timer(self)
@@ -87,7 +96,7 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
-    def menuhandler(self,num ,event):
+    def menuhandler(self, num, event):
         id = event.GetId()
         if num == 1:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
@@ -97,14 +106,15 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
-                
+
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
                     self.playlistBox.DeleteAllItems()
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
-                    self.makeCover(self.song_name, self.artist_name)
+                    self.makeCover(
+                        self.song_name, self.artist_name, pathname)
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
@@ -117,7 +127,7 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
-                
+
                 try:
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
@@ -138,7 +148,8 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
+        self.PlayerSlider = wx.Slider(
+            self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(100, 10))
         self.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
 
         # Sizer for different panels.
@@ -161,12 +172,13 @@ class Scope(wx.Frame):
         artistName = str(d[0])
         songTitle = str(d[1])
 
-        self.curs.execute('''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName,songTitle))
+        self.curs.execute(
+            '''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName, songTitle))
         path = ''.join(self.curs.fetchone())
 
         self.Player.Load(path)
         self.PlayerSlider.SetRange(0, self.Player.Length())
-        self.makeCover(songTitle, artistName)
+        self.makeCover(songTitle, artistName, path)
         self.Player.Play()
         self.ButtonPlay.SetValue(True)
 
@@ -192,10 +204,10 @@ class Scope(wx.Frame):
             self.panel, label=picPlayBtn, pos=(275, 40))
 
         self.ButtonPrev = wx.BitmapToggleButton(
-            self.panel, label=picPrevBtn, pos=(210,40))
+            self.panel, label=picPrevBtn, pos=(210, 40))
 
         self.ButtonBtn = wx.BitmapToggleButton(
-            self.panel, label=picNextBtn, pos=(340,40))
+            self.panel, label=picNextBtn, pos=(340, 40))
 
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
 
@@ -220,17 +232,24 @@ class Scope(wx.Frame):
         for x in names:
             if None not in x:
                 names = x
+                title = names[-2]
+                artist = names[-1]
+                # Call for a recommendation based on LastFM data for song.
+                self.getSongRecommendation(title, artist)
                 break
-        print(names)
-        title = names[-2]
-        artist = names[-1]
-        
+            else:
+                title = ''
+                artist = ''
+        # print(names)
+
         # Check if file has ID3 tags. If not, use the LastFM API for naming.
         try:
             audio = ID3(path)
+            self.id3tags = audio
             self.artist_name = audio['TPE1'].text[0]
             self.song_name = audio['TIT2'].text[0]
             song_year = str(audio['TDRC'].text[0])
+            self.getSongRecommendation(self.song_name, self.artist_name)
         except:
             self.artist_name = artist
             self.song_name = title
@@ -251,8 +270,8 @@ class Scope(wx.Frame):
         self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def fillPlaylistBox(self,data):
-        list1 = (data[2],data[0],data[1])
+    def fillPlaylistBox(self, data):
+        list1 = (data[2], data[0], data[1])
         self.playlistBox.InsertItem(0, list1[0])
         self.playlistBox.SetItem(0, 1, str(list1[1]))
         self.playlistBox.SetItem(0, 2, str(list1[2]))
@@ -282,26 +301,34 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def playlistd(self, data):
-        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path) 
+        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path)
                     VALUES(?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4]))
         self.conn.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def makeCover(self, track_name, artist_name):
-
+    def makeCover(self, track_name, artist_name, path):
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
+        # print(url)
         link = urllib.request.urlopen(url)
         parsed = json.load(link)
-        imagelinks = parsed['track']['album']['image']
-        imagelink = imagelinks[3]['#text']
-        filename = urllib.request.urlopen(imagelink)
+        try:
+            tags = ID3(path)
+            filename = tags.get("APIC:").data
+            self.pilimage = Image.open(BytesIO(filename))
+        except:
+            try:
+                imagelinks = parsed['track']['album']['image']
+                imagelink = imagelinks[3]['#text']
+                filename = urllib.request.urlopen(imagelink)
+                self.pilimage = Image.open(filename)
+            except:
+                print("No album cover could be loaded for the given song...")
         self.displayimage(filename)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, path):
-        self.pilimage = Image.open(path)
         self.width, self.height = self.pilimage.size
         self.pilimage.thumbnail((200, 200))
         self.PilImageToWxImage(self.pilimage)
@@ -320,6 +347,39 @@ class Scope(wx.Frame):
         self.disp.SetBitmap(wx.Bitmap(myWxImage))
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    def getSongRecommendation(self, track_name, artist_name):
+        """ url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
+        url += urllib.parse.quote(artist_name) + \
+            '&track=' + urllib.parse.quote(track_name)
+        print(url)
+        link = urllib.request.urlopen(url)
+        parsed = json.load(link)
+        for track in parsed['similartracks']['track']:
+            print(track['name']) """
+
+        sp = spotipy.Spotify(
+            client_credentials_manager=SpotifyClientCredentials())
+
+        results = sp.search(q=artist_name, limit=10, type='artist')
+        artist_url = results['artists']['items'][0]['external_urls']['spotify']
+        artist_url = str(artist_url)
+        artist_url = artist_url.split('artist/', 1)
+        artist_url = artist_url[1]
+        artist_seed = []
+        artist_seed.append(artist_url)
+        rec = sp.recommendations(seed_artists=artist_seed, limit=10)
+        for track in rec['tracks']:
+            if track['preview_url'] is not None:
+                preview_url = track['preview_url']
+                title = track['name']
+            print(str(track['preview_url']) + ' -- ' + track['name'])
+            track_name = track['name']
+            art_name = track['album']['artists'][0]['name']
+        
+
+
+#-----------------------------------------------------------------------------------------------------------------------#
+
     def OnPause(self):
         self.Player.Pause()
 
