@@ -75,7 +75,9 @@ class Scope(wx.Frame):
         self.recBox.AppendColumn("Artist", width=200)
         self.recBox.AppendColumn("Title", width=200)
         self.recBox.AppendColumn("Duration", width=100)
-        # self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED)
+        self.recommendations = []
+        self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
+                         self.loadSongFromRecommendationBox)
         self.rec.SetBackgroundColour("Gray")
 
         self.createMenu()
@@ -126,8 +128,9 @@ class Scope(wx.Frame):
                     self.makeCover(
                         self.song_name, self.artist_name, pathname)
                     try:
-                        self.getSongRecommendation(
-                            self.song_name, self.artist_name)
+                        # self.getSongRecommendation(
+                        #   self.song_name, self.artist_name)
+                        self.songrec(self.song_name, self.artist_name)
                     except:
                         print("Could not load any recommendations!")
                         self.clearRecommendationBox()
@@ -201,11 +204,30 @@ class Scope(wx.Frame):
         self.ButtonPlay.SetValue(True)
         # Moved the data load after play so as to keep player quick.
         try:
-            self.getSongRecommendation(
-                songTitle, artistName)
+           # self.getSongRecommendation(
+            #    songTitle, artistName)
+            self.songrec(songTitle, artistName)
         except:
             print("Could not load any recommendations!")
             self.clearRecommendationBox()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def loadSongFromRecommendationBox(self, e):
+        d = []
+        row = e.GetEventObject().GetFocusedItem()
+        count = self.recBox.GetItemCount()
+        cols = self.recBox.GetColumnCount()
+        for col in range(cols-1):
+            item = self.recBox.GetItem(itemIdx=row, col=col)
+            d.append(item.GetText())
+
+        artistName = str(d[0])
+        songTitle = str(d[1])
+        for song in self.recommendations:
+            if song[0] == artistName and song[1] == songTitle:
+                self.Player.LoadURI(song[2])
+                self.Player.Play()
+                break
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def scaleBitmap(self, bitmap):
@@ -318,6 +340,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def clearRecommendationBox(self):
         self.recBox.DeleteAllItems()
+        self.recommendations = []
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def establishConnection(self):
@@ -420,6 +443,7 @@ class Scope(wx.Frame):
         pparsed = json.load(uurlink)
         album_name = pparsed['track']['album']['title']
         # print(pparsed['track']['album']['title'])
+        print(album_name)
 
         sp = spotipy.Spotify(
             client_credentials_manager=SpotifyClientCredentials())
@@ -427,6 +451,7 @@ class Scope(wx.Frame):
         album_search = sp.search(q=album_name, limit=50, type='album')
         for album in album_search['albums']['items']:
             album_name_sp = album['name']
+            print(album_name_sp)
             # print(album['artists'][0]['external_urls']['spotify'])
         try:
             self.artist_url = ''
@@ -437,7 +462,7 @@ class Scope(wx.Frame):
                 if artist_name.lower() == str(artists['name']).lower():
                     artist_url = artists['external_urls']['spotify']
                     for album in album_search['albums']['items']:
-                        album_name_sp = album['name']
+                        # album_name_sp = album['name']
                         artist_url1 = album['artists'][0]['external_urls']['spotify']
                         if artist_url == artist_url1:
                             self.artist_url = artist_url1
@@ -459,13 +484,14 @@ class Scope(wx.Frame):
                     # print(str(track['preview_url']) + ' -- ' + track['name'])
                     art_name = track['album']['artists'][0]['name']
                     data = [art_name, title, preview_url]
+                    self.recommendations.append(data)
                     self.fillRecommendationBox(data)
         except:
             print("No recommendations for the given artist from Spotify's API.")
             url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
             url += urllib.parse.quote(artist_name) + \
                 '&track=' + urllib.parse.quote(track_name)
-            print(url)
+            # print(url)
             link = urllib.request.urlopen(url)
             parsed = json.load(link)
             if len(parsed['similartracks']['track']) == 0:
@@ -475,6 +501,29 @@ class Scope(wx.Frame):
                     print(track['name'])
             except:
                 print("No recommendations from LastFM API too.")
+
+    def songrec(self, track_name, artist_name):
+        artist_url = ''
+        sp = spotipy.Spotify(
+            client_credentials_manager=SpotifyClientCredentials())
+        found = False
+        off = 0
+        while (found is False):
+            track_search = sp.search(
+                q=track_name, limit=50, type='track', offset=off)
+
+            for track in track_search['tracks']['items']:
+                sp_track_name = track['name']
+                sp_artist_name = track['album']['artists'][0]['name']
+                # print(sp_track_name + ' -- ' +
+                #      sp_artist_name + ' || ' + track_name)
+                if str(track_name).lower() == str(sp_track_name).lower() and str(artist_name).lower() == str(sp_artist_name).lower():
+                    artist_url=track['album']['artists'][0]['external_urls']['spotify']
+                    found=True
+                    print(str(artist_url))
+                    break
+            off += 50
+
 #-----------------------------------------------------------------------------------------------------------------------#
 
     def OnPause(self):
@@ -494,15 +543,15 @@ class Scope(wx.Frame):
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
     def OnSeek(self, event):
-        value = self.PlayerSlider.GetValue()
+        value=self.PlayerSlider.GetValue()
         self.Player.Seek(value)
 
     def onTimer(self, event):
-        value = self.Player.Tell()
+        value=self.Player.Tell()
         self.PlayerSlider.SetValue(value)
 
 
-app = wx.App()
-frame = Scope(None, -1)
+app=wx.App()
+frame=Scope(None, -1)
 frame.Show()
 app.MainLoop()
