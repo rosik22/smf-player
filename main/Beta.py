@@ -219,10 +219,11 @@ class Scope(wx.Frame):
         title = 'n/a'
         artist = 'n/a'
         backup_name = os.path.split(path)
-        backup_name = str(backup_name[-1])
-        backup_name.split('.')
+        backup_name = backup_name[-1]
+        backup_name = backup_name.split('.')
+        backup_name = str(backup_name[0])
 
-        print(backup_name)
+        # print(backup_name)
         title = backup_name
 
         # Use acoustid API to get song data if ID3 tags are not available.
@@ -242,6 +243,9 @@ class Scope(wx.Frame):
                 names = x
                 title = names[-2]
                 artist = names[-1]
+                if ';' in artist:
+                    artist = artist.split(';')
+                    artist = artist[0]
                 break
         # print(names)
 
@@ -327,23 +331,40 @@ class Scope(wx.Frame):
         try:
             tags = ID3(path)
             filename = tags.get("APIC:").data
-            self.pilimage = Image.open(BytesIO(filename))
-            self.displayimage(filename)
+            image = Image.open(BytesIO(filename))
+            self.displayimage(image)
         except:
             try:
                 imagelinks = parsed['track']['album']['image']
                 imagelink = imagelinks[3]['#text']
                 filename = urllib.request.urlopen(imagelink)
-                self.pilimage = Image.open(filename)
-                self.displayimage(filename)
+                image = Image.open(filename)
+                self.displayimage(image)
             except:
-                print("No album cover could be loaded for the given song...")
+                print(
+                    "No album cover could be loaded for the given song from LastFM.")
 
+                """ sp = spotipy.Spotify(
+                    client_credentials_manager=SpotifyClientCredentials())
+
+                image_search = sp.search(q=track_name, limit=15, type='track')
+                for x in image_search['tracks']['items']:
+                    if track_name.lower() == str(x['album']['name']).lower():
+                        print(artist_name.lower())
+                        if artist_name.lower() == str(x['album']['artists'][0]['name']).lower():
+                            sp_album_image = str(
+                                x['album']['images'][0]['url'])
+                            print(sp_album_image)
+                            break
+                 filename=urllib.request.urlopen(sp_album_image)
+                 image=Image.open(filename)
+                 self.displayimage(image) """
 #-----------------------------------------------------------------------------------------------------------------------#
-    def displayimage(self, path):
-        self.width, self.height = self.pilimage.size
-        self.pilimage.thumbnail((200, 200))
-        self.PilImageToWxImage(self.pilimage)
+
+    def displayimage(self, image):
+        self.width, self.height = image.size
+        image.thumbnail((200, 200))
+        self.PilImageToWxImage(image)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def PilImageToWxImage(self, img):
@@ -406,7 +427,7 @@ class Scope(wx.Frame):
                 if track['preview_url'] is not None:
                     preview_url = track['preview_url']
                     title = track['name']
-                    #print(str(track['preview_url']) + ' -- ' + track['name'])
+                    # print(str(track['preview_url']) + ' -- ' + track['name'])
                     track_name = track['name']
                     art_name = track['album']['artists'][0]['name']
         except:
