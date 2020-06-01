@@ -35,7 +35,7 @@ class Scope(wx.Frame):
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Scope", style=no_resize, size=(600, 850), pos=(0, 0))
+            None, title="Scope", style=no_resize, size=(600, 920), pos=(0, 0))
 
         self.establishConnection()
 
@@ -54,19 +54,29 @@ class Scope(wx.Frame):
         self.song_name = ''
 
         # Panel for playlist listbox and filter options.
-        self.plbox = wx.Panel(self, size=(600, 550))
+        self.plbox = wx.Panel(self, size=(400, 350))
         self.playlistBox = wx.ListCtrl(self.plbox, size=(
-            550, 425), pos=(25, 25), style=wx.LC_REPORT)
+            550, 310), pos=(25, 10), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=200)
         self.playlistBox.AppendColumn("Title", width=200)
         self.playlistBox.AppendColumn("Duration", width=100)
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
-        self.plbox.SetBackgroundColour("White")
+        self.plbox.SetBackgroundColour("Gray")
 
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
         self.timer.Start(100)
+
+        # Panel for song recommendations.
+        self.rec = wx.Panel(self, size=(300, 250))
+        self.recBox = wx.ListCtrl(self.rec, size=(
+            550, 200), pos=(25, 0), style=wx.LC_REPORT)
+        self.recBox.AppendColumn("Artist", width=200)
+        self.recBox.AppendColumn("Title", width=200)
+        self.recBox.AppendColumn("Duration", width=100)
+        # self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED)
+        self.rec.SetBackgroundColour("Gray")
 
         self.createMenu()
         self.createLayout()
@@ -115,6 +125,13 @@ class Scope(wx.Frame):
                     self.getMutagenTags(pathname)
                     self.makeCover(
                         self.song_name, self.artist_name, pathname)
+                    try:
+                        self.getSongRecommendation(
+                            self.song_name, self.artist_name)
+                    except:
+                        print("Could not load any recommendations!")
+                        self.clearRecommendationBox()
+
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
@@ -157,6 +174,7 @@ class Scope(wx.Frame):
         sizer.Add(self.display, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
         sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
+        sizer.Add(self.rec, flag=wx.EXPAND | wx.ALL)
         self.SetSizer(sizer)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -181,6 +199,13 @@ class Scope(wx.Frame):
         self.makeCover(songTitle, artistName, path)
         self.Player.Play()
         self.ButtonPlay.SetValue(True)
+        # Moved the data load after play so as to keep player quick.
+        try:
+            self.getSongRecommendation(
+                songTitle, artistName)
+        except:
+            print("Could not load any recommendations!")
+            self.clearRecommendationBox()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def scaleBitmap(self, bitmap):
@@ -256,17 +281,9 @@ class Scope(wx.Frame):
             self.artist_name = audio['TPE1'].text[0]
             self.song_name = audio['TIT2'].text[0]
             song_year = str(audio['TDRC'].text[0])
-            try:
-                self.getSongRecommendation(self.song_name, self.artist_name)
-            except:
-                print("Could not load any recommendations!")
         except:
             self.artist_name = artist
             self.song_name = title
-            try:
-                self.getSongRecommendation(self.song_name, self.artist_name)
-            except:
-                print("Could not load any recommendations!")
             song_year = 'n/a'
 
         # Insert song data in list for inserting in database of currently playing songs.
@@ -289,6 +306,18 @@ class Scope(wx.Frame):
         self.playlistBox.InsertItem(0, list1[0])
         self.playlistBox.SetItem(0, 1, str(list1[1]))
         self.playlistBox.SetItem(0, 2, str(list1[2]))
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def fillRecommendationBox(self, data):
+        dur = '0:30'
+        list1 = (data[0], data[1], dur)
+        self.recBox.InsertItem(0, str(list1[0]))
+        self.recBox.SetItem(0, 1, str(list1[1]))
+        self.recBox.SetItem(0, 2, str(list1[2]))
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def clearRecommendationBox(self):
+        self.recBox.DeleteAllItems()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def establishConnection(self):
@@ -428,8 +457,9 @@ class Scope(wx.Frame):
                     preview_url = track['preview_url']
                     title = track['name']
                     # print(str(track['preview_url']) + ' -- ' + track['name'])
-                    track_name = track['name']
                     art_name = track['album']['artists'][0]['name']
+                    data = [art_name, title, preview_url]
+                    self.fillRecommendationBox(data)
         except:
             print("No recommendations for the given artist from Spotify's API.")
             url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
