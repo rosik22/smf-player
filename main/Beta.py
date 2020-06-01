@@ -59,9 +59,10 @@ class Scope(wx.Frame):
         self.plbox = wx.Panel(self, size=(400, 350))
         self.playlistBox = wx.ListCtrl(self.plbox, size=(
             550, 310), pos=(25, 10), style=wx.LC_REPORT)
-        self.playlistBox.AppendColumn("Artist", width=200)
-        self.playlistBox.AppendColumn("Title", width=200)
-        self.playlistBox.AppendColumn("Duration", width=100)
+        self.playlistBox.AppendColumn("Artist", width=150)
+        self.playlistBox.AppendColumn("Title", width=150)
+        self.playlistBox.AppendColumn("Duration", width=150)
+        self.playlistBox.AppendColumn("Times played", 100)
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
         self.plbox.SetBackgroundColour("Gray")
@@ -127,7 +128,7 @@ class Scope(wx.Frame):
                     self.playlistBox.DeleteAllItems()
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
-                    """ self.makeCover(
+                    self.makeCover(
                         self.song_name, self.artist_name, pathname)
                     try:
                         # self.getSongRecommendation(
@@ -135,11 +136,12 @@ class Scope(wx.Frame):
                         self.songrec(self.song_name, self.artist_name)
                     except:
                         print("Could not load any recommendations!")
-                        self.clearRecommendationBox() """
+                        self.clearRecommendationBox()
 
-                    if self.playlistBox.GetItemCount() == 1:
-                        self.playlistBox.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
-                        self.playlistBox.Select(0, on=1)
+                    """ if self.playlistBox.GetItemCount() == 1:
+                        self.playlistBox.SetItemState(
+                            0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                        self.playlistBox.Select(0, on=1) """
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
@@ -158,7 +160,8 @@ class Scope(wx.Frame):
                         self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
                     if self.playlistBox.GetItemCount() == 1:
-                        self.playlistBox.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                        self.playlistBox.SetItemState(
+                            0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                         self.playlistBox.Select(0, on=1)
                     if self.countAddToPlaylist < 1:
                         self.makeCover(self.song_name, self.artist_name)
@@ -194,6 +197,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
         row = e.GetEventObject().GetFocusedItem()
+        row = int(row)
         self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -215,16 +219,16 @@ class Scope(wx.Frame):
         self.PlayerSlider.SetRange(0, self.Player.Length())
         self.makeCover(songTitle, artistName, path)
         self.Player.Play()
-        self.setTimesPlayed(path,row)
+        self.setTimesPlayed(path, row)
         self.ButtonPlay.SetValue(True)
         # Moved the data load after play so as to keep player quick.
-        """ try:
+        try:
            # self.getSongRecommendation(
             #    songTitle, artistName)
             self.songrec(songTitle, artistName)
         except:
             print("Could not load any recommendations!")
-            self.clearRecommendationBox() """
+            self.clearRecommendationBox()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromRecommendationBox(self, e):
@@ -246,12 +250,14 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def setTimesPlayed(self, path, row):
-        self.curs.execute('''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
+        self.curs.execute(
+            '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
         t = int(self.curs.fetchone()[0])
         t += 1
-        self.curs.execute('''UPDATE playlist SET timesplayed=? WHERE path=?''', (t,path))
+        self.curs.execute(
+            '''UPDATE playlist SET timesplayed=? WHERE path=?''', (t, path))
         self.conn.commit()
-        self.playlistBox.SetItem(row,3,str(t))
+        self.playlistBox.SetItem(row, 3, str(t))
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def scaleBitmap(self, bitmap):
@@ -275,10 +281,10 @@ class Scope(wx.Frame):
             self.panel, label=picPlayBtn, pos=(275, 40))
 
         self.ButtonPrev = wx.BitmapButton(
-            self.panel, bitmap=picPrevBtn, pos=(210,40))
+            self.panel, bitmap=picPrevBtn, pos=(210, 40))
 
         self.ButtonNext = wx.BitmapButton(
-            self.panel, bitmap=picNextBtn, pos=(340,40))
+            self.panel, bitmap=picNextBtn, pos=(340, 40))
 
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
         self.ButtonPrev.Bind(wx.EVT_BUTTON, self.OnPrev)
@@ -355,16 +361,16 @@ class Scope(wx.Frame):
                     item = self.playlistBox.GetItem(itemIdx=row, col=col)
                     temp.append(item.GetText())
                 if temp[0] == self.artist_name and temp[1] == self.song_name:
-                    check = True  
-                    break       
+                    check = True
+                    break
 
         if check == False:
             self.playlistd(data)
             self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def fillPlaylistBox(self,data):
-        list1 = (data[2],data[0],data[1])
+    def fillPlaylistBox(self, data):
+        list1 = (data[2], data[0], data[1])
         self.playlistBox.InsertItem(self.countListCttl, list1[0])
         self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
         self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
@@ -561,8 +567,8 @@ class Scope(wx.Frame):
                 # print(sp_track_name + ' -- ' +
                 #      sp_artist_name + ' || ' + track_name)
                 if str(track_name).lower() == str(sp_track_name).lower() and str(artist_name).lower() == str(sp_artist_name).lower():
-                    artist_url=track['album']['artists'][0]['external_urls']['spotify']
-                    found=True
+                    artist_url = track['album']['artists'][0]['external_urls']['spotify']
+                    found = True
                     print(str(artist_url))
                     break
             off += 50
@@ -571,9 +577,10 @@ class Scope(wx.Frame):
     def OnNext(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current < self.playlistBox.GetItemCount()-1:
-            self.playlistBox.SetItemState(current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+            self.playlistBox.SetItemState(
+                current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
             self.playlistBox.Select(current, on=0)
-            self.playlistBox.Select(current+1,on=1)
+            self.playlistBox.Select(current+1, on=1)
         else:
             self.playlistBox.Select(current, on=0)
             self.playlistBox.Select(current, on=1)
@@ -582,9 +589,10 @@ class Scope(wx.Frame):
     def OnPrev(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current > self.playlistBox.GetTopItem():
-            self.playlistBox.SetItemState(current-1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+            self.playlistBox.SetItemState(
+                current-1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
             self.playlistBox.Select(current, on=0)
-            self.playlistBox.Select(current-1,on=1)
+            self.playlistBox.Select(current-1, on=1)
         else:
             self.playlistBox.Select(current, on=0)
             self.playlistBox.Select(current, on=1)
@@ -609,24 +617,26 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def OnSeek(self, event):
-        value=self.PlayerSlider.GetValue()
+        value = self.PlayerSlider.GetValue()
         self.Player.Seek(value)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def onTimer(self, event):
-        value=self.Player.Tell()
+        value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
         if value > self.Player.Length():
             current = self.playlistBox.GetFocusedItem()
             if current < self.playlistBox.GetItemCount()-1:
-                self.playlistBox.SetItemState(current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                self.playlistBox.SetItemState(
+                    current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
-                self.playlistBox.Select(current+1,on=1)
+                self.playlistBox.Select(current+1, on=1)
 
 #-----------------------------------------------------------------------------------------------------------------------#
 #-----------------------------------------------------------------------------------------------------------------------#
 
-app=wx.App()
-frame=Scope(None, -1)
+
+app = wx.App()
+frame = Scope(None, -1)
 frame.Show()
 app.MainLoop()
