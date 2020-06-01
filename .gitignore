@@ -131,5 +131,8 @@ dmypy.json
 # Config for vscode
 /.vscode
 
-#Ignore db file from SQLite
+# Ignore db file from SQLite
 *.db
+
+#Ignore file
+tomergewith.py
