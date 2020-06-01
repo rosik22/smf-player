@@ -216,6 +216,14 @@ class Scope(wx.Frame):
         data = []
         song = MutaFile(path)
         d = int(song.info.length)
+        title = 'n/a'
+        artist = 'n/a'
+        backup_name = os.path.split(path)
+        backup_name = str(backup_name[-1])
+        backup_name.split('.')
+
+        print(backup_name)
+        title = backup_name
 
         # Use acoustid API to get song data if ID3 tags are not available.
         fing = fingerprint_file(path, force_fpcalc=True)
@@ -234,12 +242,7 @@ class Scope(wx.Frame):
                 names = x
                 title = names[-2]
                 artist = names[-1]
-                # Call for a recommendation based on LastFM data for song.
-                self.getSongRecommendation(title, artist)
                 break
-            else:
-                title = ''
-                artist = ''
         # print(names)
 
         # Check if file has ID3 tags. If not, use the LastFM API for naming.
@@ -249,11 +252,18 @@ class Scope(wx.Frame):
             self.artist_name = audio['TPE1'].text[0]
             self.song_name = audio['TIT2'].text[0]
             song_year = str(audio['TDRC'].text[0])
-            self.getSongRecommendation(self.song_name, self.artist_name)
+            try:
+                self.getSongRecommendation(self.song_name, self.artist_name)
+            except:
+                print("Could not load any recommendations!")
         except:
             self.artist_name = artist
             self.song_name = title
-            song_year = ''
+            try:
+                self.getSongRecommendation(self.song_name, self.artist_name)
+            except:
+                print("Could not load any recommendations!")
+            song_year = 'n/a'
 
         # Insert song data in list for inserting in database of currently playing songs.
         minutes = d // 60
@@ -317,15 +327,16 @@ class Scope(wx.Frame):
             tags = ID3(path)
             filename = tags.get("APIC:").data
             self.pilimage = Image.open(BytesIO(filename))
+            self.displayimage(filename)
         except:
             try:
                 imagelinks = parsed['track']['album']['image']
                 imagelink = imagelinks[3]['#text']
                 filename = urllib.request.urlopen(imagelink)
                 self.pilimage = Image.open(filename)
+                self.displayimage(filename)
             except:
                 print("No album cover could be loaded for the given song...")
-        self.displayimage(filename)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, path):
@@ -348,36 +359,70 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def getSongRecommendation(self, track_name, artist_name):
-        """ url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
-        url += urllib.parse.quote(artist_name) + \
+        # Get album name for reference from LastFM API.
+
+        uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
+        uurl += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
-        print(url)
-        link = urllib.request.urlopen(url)
-        parsed = json.load(link)
-        for track in parsed['similartracks']['track']:
-            print(track['name']) """
+
+        uurlink = urllib.request.urlopen(uurl)
+        pparsed = json.load(uurlink)
+        album_name = pparsed['track']['album']['title']
+        # print(pparsed['track']['album']['title'])
 
         sp = spotipy.Spotify(
             client_credentials_manager=SpotifyClientCredentials())
 
-        results = sp.search(q=artist_name, limit=10, type='artist')
-        artist_url = results['artists']['items'][0]['external_urls']['spotify']
-        artist_url = str(artist_url)
-        artist_url = artist_url.split('artist/', 1)
-        artist_url = artist_url[1]
-        artist_seed = []
-        artist_seed.append(artist_url)
-        rec = sp.recommendations(seed_artists=artist_seed, limit=10)
-        for track in rec['tracks']:
-            if track['preview_url'] is not None:
-                preview_url = track['preview_url']
-                title = track['name']
-            print(str(track['preview_url']) + ' -- ' + track['name'])
-            track_name = track['name']
-            art_name = track['album']['artists'][0]['name']
-        
-
-
+        album_search = sp.search(q=album_name, limit=50, type='album')
+        for album in album_search['albums']['items']:
+            album_name_sp = album['name']
+            # print(album['artists'][0]['external_urls']['spotify'])
+        try:
+            self.artist_url = ''
+            results = sp.search(q=artist_name, limit=20, type='artist')
+            for artists in results['artists']['items']:
+                if self.artist_url != '':
+                    break
+                if artist_name.lower() == str(artists['name']).lower():
+                    artist_url = artists['external_urls']['spotify']
+                    for album in album_search['albums']['items']:
+                        album_name_sp = album['name']
+                        artist_url1 = album['artists'][0]['external_urls']['spotify']
+                        if artist_url == artist_url1:
+                            self.artist_url = artist_url1
+                            break
+            self.artist_url = str(self.artist_url)
+            print(self.artist_url)
+            self.artist_url = self.artist_url.split('artist/', 1)
+            self.artist_url = self.artist_url[1]
+            artist_seed = []
+            artist_seed.append(self.artist_url)
+            rec = sp.recommendations(seed_artists=artist_seed, limit=20)
+            if len(rec['tracks']) == 0:
+                raise Exception("No recommendations")
+            for track in rec['tracks']:
+                print(len(rec['tracks']))
+                if track['preview_url'] is not None:
+                    preview_url = track['preview_url']
+                    title = track['name']
+                    print(str(track['preview_url']) + ' -- ' + track['name'])
+                    track_name = track['name']
+                    art_name = track['album']['artists'][0]['name']
+        except:
+            print("No recommendations for the given artist from Spotify's API.")
+            url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
+            url += urllib.parse.quote(artist_name) + \
+                '&track=' + urllib.parse.quote(track_name)
+            print(url)
+            link = urllib.request.urlopen(url)
+            parsed = json.load(link)
+            if len(parsed['similartracks']['track']) == 0:
+                print("No recommendations from LastFM API too.")
+            try:
+                for track in parsed['similartracks']['track']:
+                    print(track['name'])
+            except:
+                print("No recommendations from LastFM API too.")
 #-----------------------------------------------------------------------------------------------------------------------#
 
     def OnPause(self):
