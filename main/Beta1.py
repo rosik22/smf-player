@@ -164,7 +164,7 @@ class Scope(wx.Frame):
                             0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                         self.playlistBox.Select(0, on=1)
                     if self.countAddToPlaylist < 1:
-                        self.makeCover(self.song_name, self.artist_name)
+                        self.makeCover(self.song_name, self.artist_name, pathname)
                         self.countAddToPlaylist += 1
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
@@ -197,7 +197,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
         row = e.GetEventObject().GetFocusedItem()
-        row = int(row)
+
         self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -213,7 +213,7 @@ class Scope(wx.Frame):
 
         self.curs.execute(
             '''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName, songTitle))
-        path = ''.join(self.curs.fetchone())
+        path = ' '.join(self.curs.fetchone())
 
         self.Player.Load(path)
         self.PlayerSlider.SetRange(0, self.Player.Length())
@@ -364,7 +364,7 @@ class Scope(wx.Frame):
                     check = True
                     break
 
-        if check == False:
+        if check is False:
             self.playlistd(data)
             self.fillPlaylistBox(data)
 
@@ -577,6 +577,7 @@ class Scope(wx.Frame):
     def OnNext(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current < self.playlistBox.GetItemCount()-1:
+            self.loadSong(current+1)
             self.playlistBox.SetItemState(
                 current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
             self.playlistBox.Select(current, on=0)
@@ -627,10 +628,9 @@ class Scope(wx.Frame):
         if value > self.Player.Length():
             current = self.playlistBox.GetFocusedItem()
             if current < self.playlistBox.GetItemCount()-1:
-                self.playlistBox.SetItemState(
-                    current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                self.playlistBox.SetItemState(current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
-                self.playlistBox.Select(current+1, on=1)
+                self.playlistBox.Select(current+1,on=1)
 
 #-----------------------------------------------------------------------------------------------------------------------#
 #-----------------------------------------------------------------------------------------------------------------------#
