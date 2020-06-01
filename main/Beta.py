@@ -72,6 +72,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def OnClose(self, e):
         self.conn.close()
+        self.Player.SetVolume(1.0)
         self.Destroy()
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -100,6 +101,8 @@ class Scope(wx.Frame):
                     return
 
                 pathname = file.GetPath()
+                self.countListCttl = 0
+                self.countAddToPlaylist += 1
                 
                 try:
                     self.curs.execute('DELETE FROM playlist;')
@@ -107,9 +110,8 @@ class Scope(wx.Frame):
                     self.playlistBox.DeleteAllItems()
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
-                    if self.playlistBox.GetItemCount() == 1:
-                        self.playlistBox.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
-                        self.playlistBox.Select(0, on=1)
+                    self.playlistBox.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                    self.playlistBox.Select(0, on=1)
                     self.makeCover(self.song_name, self.artist_name)
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
@@ -151,7 +153,15 @@ class Scope(wx.Frame):
             raise
 
         self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
-        self.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
+        self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
+
+        # Slider for volume
+        self.currentVolume = 100
+        self.volumeCtrl = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(100,-1), pos=(400,40))
+        self.volumeCtrl.SetRange(0, 100)
+        self.volumeCtrl.SetValue(100)
+        self.Player.SetVolume(1.0)
+        self.volumeCtrl.Bind(wx.EVT_SLIDER, self.onVolume, self.volumeCtrl)
 
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -402,6 +412,10 @@ class Scope(wx.Frame):
     def OnSeek(self, event):
         value = self.PlayerSlider.GetValue()
         self.Player.Seek(value)
+
+    def onVolume(self, event):
+        self.currentVolume = self.volumeCtrl.GetValue()
+        self.Player.SetVolume(self.currentVolume/100)
 
     def onTimer(self, event):
         value = self.Player.Tell()
