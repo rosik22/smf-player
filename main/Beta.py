@@ -317,6 +317,7 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def makeCover(self, track_name, artist_name, path):
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(300, 300)))
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
@@ -392,7 +393,7 @@ class Scope(wx.Frame):
                             self.artist_url = artist_url1
                             break
             self.artist_url = str(self.artist_url)
-            print(self.artist_url)
+            # print(self.artist_url)
             self.artist_url = self.artist_url.split('artist/', 1)
             self.artist_url = self.artist_url[1]
             artist_seed = []
@@ -401,11 +402,11 @@ class Scope(wx.Frame):
             if len(rec['tracks']) == 0:
                 raise Exception("No recommendations")
             for track in rec['tracks']:
-                print(len(rec['tracks']))
+                # print(len(rec['tracks']))
                 if track['preview_url'] is not None:
                     preview_url = track['preview_url']
                     title = track['name']
-                    print(str(track['preview_url']) + ' -- ' + track['name'])
+                    #print(str(track['preview_url']) + ' -- ' + track['name'])
                     track_name = track['name']
                     art_name = track['album']['artists'][0]['name']
         except:
