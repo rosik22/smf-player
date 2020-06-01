@@ -127,7 +127,7 @@ class Scope(wx.Frame):
                     self.playlistBox.DeleteAllItems()
                     self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
-                    self.makeCover(
+                    """ self.makeCover(
                         self.song_name, self.artist_name, pathname)
                     try:
                         # self.getSongRecommendation(
@@ -135,7 +135,7 @@ class Scope(wx.Frame):
                         self.songrec(self.song_name, self.artist_name)
                     except:
                         print("Could not load any recommendations!")
-                        self.clearRecommendationBox()
+                        self.clearRecommendationBox() """
 
                     if self.playlistBox.GetItemCount() == 1:
                         self.playlistBox.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
@@ -218,13 +218,13 @@ class Scope(wx.Frame):
         self.setTimesPlayed(path,row)
         self.ButtonPlay.SetValue(True)
         # Moved the data load after play so as to keep player quick.
-        try:
+        """ try:
            # self.getSongRecommendation(
             #    songTitle, artistName)
             self.songrec(songTitle, artistName)
         except:
             print("Could not load any recommendations!")
-            self.clearRecommendationBox()
+            self.clearRecommendationBox() """
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromRecommendationBox(self, e):
