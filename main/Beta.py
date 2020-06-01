@@ -31,6 +31,7 @@ class Scope(wx.Frame):
             None, title="Scope", style=no_resize, size=(600, 850), pos=(0, 0))
 
         self.establishConnection()
+        print("hello")
 
         self.SetBackgroundColour("Black")
         self.countListCttl = 0
