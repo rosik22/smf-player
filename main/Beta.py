@@ -246,17 +246,15 @@ class Scope(wx.Frame):
                     print(recs[3])
                     break
         if found is False and timesplayed < 1:
-            try:
-                self.getSongRecommendation(songTitle, artistName)
-                # self.songrec(self.song_name, self.artist_name)
-            except:
-                print("Could not load any recommendations with LastFM/Spotify combo..")
-                print("Trying long query of Spotify Web API...")
                 try:
-                    self.songrec(songTitle, artistName)
+                    self.getSongRecommendationByAlbumArtist(songTitle, artistName)
                 except:
-                    print("No recommendations for the current title...")
-
+                    print("No recommendations by Album/Artist...")
+                    print("Trying long query by Track/Artist...")
+                    try:
+                        self.songRecommendationByTrackArtist(songTitle, artistName)
+                    except:
+                        print("No recommendations for current title..")
 #-----------------------------------------------------------------------------------------------------------------------#
 
     def loadSongFromRecommendationBox(self, e):
@@ -409,8 +407,8 @@ class Scope(wx.Frame):
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.lower().endswith(('.mp3', '.flac', '.wav', '.aac', 'ogg')):
-                    paths.append(os.path.join(root,file))
-                    
+                    paths.append(os.path.join(root, file))
+
         for x in paths:
             self.getMutagenTags(x)
 
@@ -512,45 +510,37 @@ class Scope(wx.Frame):
         self.disp.SetBitmap(wx.Bitmap(myWxImage))
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    def getSongRecommendation(self, track_name, artist_name):
-        # Get album name for reference from LastFM API.
-        uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
-        uurl += urllib.parse.quote(artist_name) + \
-            '&track=' + urllib.parse.quote(track_name)
-
-        uurlink = urllib.request.urlopen(uurl)
-        pparsed = json.load(uurlink)
-        album_name = pparsed['track']['album']['title']
-
-        recommendations = []
-        sp = spotipy.Spotify(
-            client_credentials_manager=SpotifyClientCredentials())
-
-        album_search = sp.search(q=album_name, limit=50, type='album')
-        for album in album_search['albums']['items']:
-            album_name_sp = album['name']
-
+    def getSongRecommendationByAlbumArtist(self, track_name, artist_name):
         try:
-            self.artist_url = ''
-            results = sp.search(q=artist_name, limit=20, type='artist')
+            # Get album name for reference from LastFM API.
+            album_name = ''
+            uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
+            uurl += urllib.parse.quote(artist_name) + \
+                '&track=' + urllib.parse.quote(track_name)
 
-            for artists in results['artists']['items']:
-                if self.artist_url != '':
-                    break
+            uurlink = urllib.request.urlopen(uurl)
+            pparsed = json.load(uurlink)
+            album_name = pparsed['track']['album']['title']
 
-                if artist_name.lower() == str(artists['name']).lower():
-                    artist_url = artists['external_urls']['spotify']
+            recommendations = []
+            sp = spotipy.Spotify(
+                client_credentials_manager=SpotifyClientCredentials())
+            off = 0
+            found = False
+            while (found is False and off < 150):
+                # Search for album in spotify.
+                album_search = sp.search(
+                    q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
+                print(album_search)
+                for album in album_search['albums']['items']:
+                    album_name_sp = album['name']
+                    if artist_name.lower() == str(album['artists'][0]['name']).lower():
+                        self.artist_url = album['artists'][0]['id']
+                        sp_artist_name = album['artists'][0]['name']
+                        found = True
+                        break
+                off += 50
 
-                    for album in album_search['albums']['items']:
-                        artist_url1 = album['artists'][0]['external_urls']['spotify']
-
-                        if artist_url == artist_url1:
-                            self.artist_url = artist_url1
-                            break
-
-            self.artist_url = str(self.artist_url)
-            self.artist_url = self.artist_url.split('artist/', 1)
-            self.artist_url = self.artist_url[1]
             artist_seed = []
             artist_seed.append(self.artist_url)
             rec = sp.recommendations(seed_artists=artist_seed, limit=20)
@@ -586,7 +576,8 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
 
-    def songrec(self, track_name, artist_name):
+
+    def songRecommendationByTrackArtist(self, track_name, artist_name):
         artist_url = ''
         recommendations = []
         sp = spotipy.Spotify(
@@ -594,25 +585,18 @@ class Scope(wx.Frame):
 
         found = False
         off = 0
-        while (found is False or off < 100):
+        while (found is False or off < 150):
             track_search = sp.search(
-                q=track_name, limit=50, type='track', offset=off)
+                q='track:'+track_name+' '+'artist:'+artist_name, limit=50, type='track', offset=off)
 
             for track in track_search['tracks']['items']:
-                sp_track_name = track['name']
-                sp_artist_name = track['album']['artists'][0]['name']
-
-                if str(track_name).lower() == str(sp_track_name).lower() and str(artist_name).lower() == str(sp_artist_name).lower():
-                    artist_url = track['album']['artists'][0]['external_urls']['spotify']
-                    found = True
-                    print(str(artist_url))
-                    break
+                artist_url = track['artists'][0]['id']
+                found = True
+                print(str(artist_url))
+                break
 
             off += 50
 
-        artist_url = str(artist_url)
-        artist_url = artist_url.split('artist/', 1)
-        artist_url = artist_url[1]
         artist_seed = []
         artist_seed.append(artist_url)
         rec = sp.recommendations(seed_artists=artist_seed, limit=20)
@@ -633,6 +617,7 @@ class Scope(wx.Frame):
         self.fillRecommendationBox(recommendations, artist_name)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+
     def OnNext(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current < self.playlistBox.GetItemCount()-1:
