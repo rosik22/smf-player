@@ -33,13 +33,13 @@ currentpl = 'playing.db'
 recommendation_data = 'rec.db'
 
 
-class Scope(wx.Frame):
+class Ultra(wx.Frame):
     def __init__(self, parent, id):
 
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Scope", style=no_resize, size=(600, 920), pos=(0, 0))
+            None, title="Ultra", style=no_resize, size=(1300, 800), pos=(0, 0))
 
         self.establishConnectionRun()
 
@@ -49,41 +49,45 @@ class Scope(wx.Frame):
        # self.allPaths = {}
 
         # Playback panel
-        self.panel = wx.Panel(self, size=(600, 100))
+        self.panel = wx.Panel(self, size=(700, 200))
         self.panel.SetBackgroundColour("Black")
 
         # Panel for album cover
-        self.display = wx.Panel(self, size=(200, 200))
+        self.display = wx.Panel(self, size=(700, 600))
         self.display.SetBackgroundColour("Black")
         self.disp = wx.StaticBitmap(
-            self.display, size=(200, 200), pos=(200, 0))
+            self.display, size=(500, 500), pos=(100, 50))
         self.artist_name = ''
         self.song_name = ''
 
         # Panel for playlist listbox and filter options.
-        self.plbox = wx.Panel(self, size=(400, 350))
+        self.plbox = wx.Panel(self, size=(600, 500))
         self.playlistBox = wx.ListCtrl(self.plbox, size=(
-            550, 310), pos=(25, 10), style=wx.LC_REPORT)
+            550, 425), pos=(25, 10), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=150)
         self.playlistBox.AppendColumn("Title", width=150)
-        self.playlistBox.AppendColumn("Duration", width=150)
-        self.playlistBox.AppendColumn("Times played", width=100)
+        self.playlistBox.AppendColumn("Duration", width=125)
+        self.playlistBox.AppendColumn("Counter", width=125)
+        self.playlistBox.SetBackgroundColour("Light grey")
+        self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
 
-        self.plbox.SetBackgroundColour("Gray")
+        self.plbox.SetBackgroundColour("White")
 
         # Panel for song recommendations.
-        self.rec = wx.Panel(self, size=(300, 250))
+        self.rec = wx.Panel(self, size=(600, 300))
         self.recBox = wx.ListCtrl(self.rec, size=(
-            550, 200), pos=(25, 0), style=wx.LC_REPORT)
+            550, 220), pos=(25, 0), style=wx.LC_REPORT)
         self.recBox.AppendColumn("Artist", width=200)
         self.recBox.AppendColumn("Title", width=200)
-        self.recBox.AppendColumn("Duration", width=100)
+        self.recBox.AppendColumn("Duration", width=150)
+        self.recBox.SetBackgroundColour("Light grey")
+        self.recBox.SetTextColour("Black")
         self.recommendations = []
         self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                          self.loadSongFromRecommendationBox)
-        self.rec.SetBackgroundColour("Gray")
+        self.rec.SetBackgroundColour("White")
         self.recommendations = []
 
         self.timer = wx.Timer(self)
@@ -201,24 +205,35 @@ class Scope(wx.Frame):
             raise
 
         self.PlayerSlider = wx.Slider(
-            self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(100, 10))
+            self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(150, 10))
         self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
+
+        #filter
+        filters = ['Artist', 'Title']
+        self.combo = wx.ComboBox(self.plbox, choices=filters, pos=(250,450))
+        self.enterPref = wx.TextCtrl(self.plbox, size=(100,35), pos=(100,450))
 
         # Slider for volume
         self.currentVolume = 100
         self.volumeCtrl = wx.Slider(
-            self.panel, style=wx.SL_HORIZONTAL, size=(100, -1), pos=(400, 40))
+            self.panel, style=wx.SL_HORIZONTAL, size=(100, -1), pos=(450, 40))
         self.volumeCtrl.SetRange(0, 100)
         self.volumeCtrl.SetValue(100)
         self.Player.SetVolume(1.0)
         self.volumeCtrl.Bind(wx.EVT_SLIDER, self.onVolume, self.volumeCtrl)
 
         # Sizer for different panels.
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.display, flag=wx.EXPAND | wx.ALL)
-        sizer.Add(self.panel, flag=wx.EXPAND | wx.ALL)
-        sizer.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
-        sizer.Add(self.rec, flag=wx.EXPAND | wx.ALL)
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        s1 = wx.BoxSizer(wx.VERTICAL)
+        s2 = wx.BoxSizer(wx.VERTICAL)
+
+        s1.Add(self.display, flag=wx.EXPAND | wx.ALL)
+        s1.Add(self.panel, flag=wx.EXPAND | wx.ALL)
+        s2.Add(self.plbox, flag=wx.EXPAND | wx.ALL)
+        s2.Add(self.rec, flag=wx.EXPAND | wx.ALL)
+
+        sizer.Add(s1)
+        sizer.Add(s2)
         self.SetSizer(sizer)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -311,7 +326,7 @@ class Scope(wx.Frame):
     def clearPanel(self):
         self.Player.Stop()
         self.PlayerSlider.SetValue(0)
-        self.disp.SetBitmap(wx.Bitmap(wx.Image(300, 300)))
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
         self.ButtonPlay.SetValue(False)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -327,13 +342,13 @@ class Scope(wx.Frame):
 
         artistName = str(d[0])
         songTitle = str(d[1])
-        print(artistName)
         for s in self.recommendations:
             for song in s:
                 if song[0] == artistName and song[1] == songTitle:
                     self.Player.LoadURI(song[2])
-                    self.PlayerSlider.SetRange(0, self.Player.Length())
                     self.Player.Play()
+                    self.PlayerSlider.SetValue(0)
+                    self.PlayerSlider.SetRange(0, 30000)
                     break
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -356,6 +371,8 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def Buttons(self):
+        self.FilterBtn = wx.Button(self.plbox, label="Filter", size=(100,30), pos=(400,453))
+
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
         picPlayBtn = self.scaleBitmap(picPlayBtn)
 
@@ -366,17 +383,19 @@ class Scope(wx.Frame):
         picNextBtn = self.scaleBitmap(picNextBtn)
 
         self.ButtonPlay = wx.BitmapToggleButton(
-            self.panel, label=picPlayBtn, pos=(275, 40))
+            self.panel, label=picPlayBtn, pos=(325, 40))
 
         self.ButtonPrev = wx.BitmapButton(
-            self.panel, bitmap=picPrevBtn, pos=(210, 40))
+            self.panel, bitmap=picPrevBtn, pos=(260, 40))
 
         self.ButtonNext = wx.BitmapButton(
-            self.panel, bitmap=picNextBtn, pos=(340, 40))
+            self.panel, bitmap=picNextBtn, pos=(390, 40))
 
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
         self.ButtonPrev.Bind(wx.EVT_BUTTON, self.OnPrev)
         self.ButtonNext.Bind(wx.EVT_BUTTON, self.OnNext)
+
+        self.FilterBtn.Bind(wx.EVT_BUTTON, self.onFilter)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def getMutagenTags(self, path):
@@ -510,7 +529,7 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def makeCover(self, track_name, artist_name, path):
-        self.disp.SetBitmap(wx.Bitmap(wx.Image(300, 300)))
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
@@ -536,7 +555,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, image):
         self.width, self.height = image.size
-        image.thumbnail((200, 200))
+        image.thumbnail((500, 500))
         self.PilImageToWxImage(image)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -741,6 +760,9 @@ class Scope(wx.Frame):
         self.currentVolume = self.volumeCtrl.GetValue()
         self.Player.SetVolume(self.currentVolume/100)
 
+    def onFilter(self, event):
+        print(self.GetPosition())
+
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
@@ -754,6 +776,6 @@ class Scope(wx.Frame):
 
 
 app = wx.App()
-frame = Scope(None, -1)
+frame = Ultra(None, -1)
 frame.Show()
 app.MainLoop()
