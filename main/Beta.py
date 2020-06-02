@@ -752,7 +752,6 @@ class Scope(wx.Frame):
                 self.playlistBox.Select(current, on=0)
                 self.playlistBox.Select(current+1, on=1)
 
-
 app = wx.App()
 frame = Scope(None, -1)
 frame.Show()
