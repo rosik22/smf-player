@@ -105,8 +105,8 @@ class Scope(wx.Frame):
     def createMenu(self):
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
-        openf = filemenu.Append(-1, '&Open folder')
         open1 = filemenu.Append(-1, '&Open')
+        openf = filemenu.Append(-1, '&Open folder')
         add = filemenu.Append(-1, '&Add to playlist')
         exit2 = filemenu.Append(-1, '&Exit')
         menubar.Append(filemenu, '&File')
@@ -127,6 +127,8 @@ class Scope(wx.Frame):
                     return
 
                 pathname = directory.GetPath()
+                self.playlistBox.DeleteAllItems()
+                self.clearRecommendationBox()
 
                 try:
                     self.loadFolder(pathname)
