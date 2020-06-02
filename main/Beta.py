@@ -13,6 +13,7 @@ import json
 import spotipy
 import wave
 import contextlib
+import re
 from spotipy.oauth2 import SpotifyClientCredentials
 from mutagen.id3 import ID3
 from mutagen import File as MutaFile
@@ -129,10 +130,11 @@ class Scope(wx.Frame):
                     return
 
                 pathname = directory.GetPath()
-                self.playlistBox.DeleteAllItems()
-                self.clearRecommendationBox()
+                self.countListCttl = 0
 
                 try:
+                    self.playlistBox.DeleteAllItems()
+                    self.clearRecommendationBox()
                     self.loadFolder(pathname)
                 except:
                     print("Error during loading the path and/or files within...")
@@ -146,7 +148,7 @@ class Scope(wx.Frame):
 
                 pathname = file.GetPath()
                 self.countListCttl = 0
-                
+
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
@@ -198,12 +200,14 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
+        self.PlayerSlider = wx.Slider(
+            self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(100, 10))
         self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
 
         # Slider for volume
         self.currentVolume = 100
-        self.volumeCtrl = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(100,-1), pos=(400,40))
+        self.volumeCtrl = wx.Slider(
+            self.panel, style=wx.SL_HORIZONTAL, size=(100, -1), pos=(400, 40))
         self.volumeCtrl.SetRange(0, 100)
         self.volumeCtrl.SetValue(100)
         self.Player.SetVolume(1.0)
@@ -234,6 +238,7 @@ class Scope(wx.Frame):
         artistName = str(d[0])
         songTitle = str(d[1])
 
+
         self.curs.execute(
             '''SELECT path FROM playlist WHERE artist=? AND title=?''', (artistName, songTitle))
         path = ''.join(self.curs.fetchone())
@@ -247,6 +252,16 @@ class Scope(wx.Frame):
         self.Player.Play()
         self.setTimesPlayed(path, row)
         self.ButtonPlay.SetValue(True)
+
+        if artistName == 'n/a':
+            self.getNamesLastFM(path)
+            try:
+
+                songTitle = self.song_name1
+                artistName = self.artist_name1
+
+            except:
+                print('No name data')
         self.makeCover(songTitle, artistName, path)
         found = False
         for recs in self.recommendations:
@@ -257,15 +272,15 @@ class Scope(wx.Frame):
                     print(recs[3])
                     break
         if found is False and timesplayed < 1:
+            try:
+                self.getSongRecommendationByAlbumArtist(songTitle, artistName)
+            except:
+                print("No recommendations by Album/Artist...")
+                print("Trying long query by Track/Artist...")
                 try:
-                    self.getSongRecommendationByAlbumArtist(songTitle, artistName)
+                    self.songRecommendationByTrackArtist(songTitle, artistName)
                 except:
-                    print("No recommendations by Album/Artist...")
-                    print("Trying long query by Track/Artist...")
-                    try:
-                        self.songRecommendationByTrackArtist(songTitle, artistName)
-                    except:
-                        print("No recommendations for current title..")
+                    print("No recommendations for current title..")
 #-----------------------------------------------------------------------------------------------------------------------#
 
     def loadSongFromRecommendationBox(self, e):
@@ -279,10 +294,12 @@ class Scope(wx.Frame):
 
         artistName = str(d[0])
         songTitle = str(d[1])
+        print(artistName)
         for s in self.recommendations:
             for song in s:
                 if song[0] == artistName and song[1] == songTitle:
                     self.Player.LoadURI(song[2])
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
                     self.Player.Play()
                     break
 
@@ -333,12 +350,12 @@ class Scope(wx.Frame):
         data = []
         try:
             song = MutaFile(path)
-            d = int(song.info.length)
+            self.d = int(song.info.length)
         except:
             with contextlib.closing(wave.open(path, 'r')) as file:
                 frames = file.getnframes()
                 rate = file.getframerate()
-                d = frames / float(rate)
+                self.d = frames / float(rate)
         title = 'n/a'
         artist = 'n/a'
         backup_name = os.path.split(path)
@@ -349,35 +366,14 @@ class Scope(wx.Frame):
         # print(backup_name)
         title = backup_name
 
-        # Use acoustid API to get song data if ID3 tags are not available.
-        fing = fingerprint_file(path, force_fpcalc=True)
-        fing = fing[1]
-        fing = str(fing)
-        fing = fing[2:-1]
-        url = 'https://api.acoustid.org/v2/lookup?client=Bklmy2zJQL&meta=recordings+releasegroups+compress&duration='
-        url += str(d)
-        url += '&fingerprint='
-        url += fing
-        try:
-            text = urllib.request.urlopen(url)
-            parsed = json.loads(text.read())
-            names = list(acoustid.parse_lookup_result(parsed))
-            for x in names:
-                if None not in x:
-                    names = x
-                    title = names[-2]
-                    artist = names[-1]
-                    if ';' in artist:
-                        artist = artist.split(';')
-                        artist = artist[0]
-                    break
-        except:
-            print("No name data...")
-        # Check if file has ID3 tags. If not, use the LastFM API for naming.
         try:
             audio = ID3(path)
             self.artist_name = audio['TPE1'].text[0]
             self.song_name = audio['TIT2'].text[0]
+            self.artist_name = re.split(',|\(|\)|\?', self.artist_name)
+            self.artist_name = self.artist_name[0]
+            self.song_name = re.split(',|\(|\)|\?', self.song_name)
+            self.song_name = self.song_name[0]
             song_year = str(audio['TDRC'].text[0])
         except:
             self.artist_name = artist
@@ -385,8 +381,8 @@ class Scope(wx.Frame):
             song_year = ''
 
         # Insert song data in list for inserting in database of currently playing songs.
-        minutes = int(d // 60)
-        seconds = int(d % 60)
+        minutes = int(self.d // 60)
+        seconds = int(self.d % 60)
         duration = str(minutes) + ":" + str(seconds)
 
         data.append(self.song_name)
@@ -396,7 +392,7 @@ class Scope(wx.Frame):
         data.append(path)
 
         #self.allPaths[self.artist_name] = {}
-        #self.allPaths[self.artist_name][self.song_name]
+        # self.allPaths[self.artist_name][self.song_name]
 
         check = False
         if self.playlistBox.GetItemCount() > 0:
@@ -423,8 +419,11 @@ class Scope(wx.Frame):
                 if file.lower().endswith(('.mp3', '.flac', '.wav', '.aac', 'ogg')):
                     paths.append(os.path.join(root, file))
 
-        for x in paths:
-            self.getMutagenTags(x)
+        try:
+            for x in paths:
+                self.getMutagenTags(x)
+        except:
+            print("Mutagen error..")
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
@@ -526,6 +525,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def getSongRecommendationByAlbumArtist(self, track_name, artist_name):
         try:
+            print(artist_name + ' -- ' + track_name)
             # Get album name for reference from LastFM API.
             album_name = ''
             uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
@@ -545,10 +545,11 @@ class Scope(wx.Frame):
                 # Search for album in spotify.
                 album_search = sp.search(
                     q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
-                #print(album_search)
+
                 for album in album_search['albums']['items']:
                     album_name_sp = album['name']
                     if artist_name.lower() == str(album['artists'][0]['name']).lower():
+
                         self.artist_url = album['artists'][0]['id']
                         sp_artist_name = album['artists'][0]['name']
                         found = True
@@ -590,7 +591,6 @@ class Scope(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
 
-
     def songRecommendationByTrackArtist(self, track_name, artist_name):
         artist_url = ''
         recommendations = []
@@ -629,6 +629,39 @@ class Scope(wx.Frame):
 
         self.recommendations.append(recommendations)
         self.fillRecommendationBox(recommendations, artist_name)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def getNamesLastFM(self, path):
+        # Use acoustid API to get song data if ID3 tags are not available.
+        fing = fingerprint_file(path, force_fpcalc=True)
+        fing = fing[1]
+        fing = str(fing)
+        fing = fing[2:-1]
+        url = 'https://api.acoustid.org/v2/lookup?client=Bklmy2zJQL&meta=recordings+releasegroups+compress&duration='
+        url += str(self.d)
+        url += '&fingerprint='
+        url += fing
+        try:
+            text = urllib.request.urlopen(url)
+            parsed = json.loads(text.read())
+            names = list(acoustid.parse_lookup_result(parsed))
+            for x in names:
+                if None not in x:
+                    names = x
+                    title = names[-2]
+                    artist = names[-1]
+                    if ';' in artist:
+                        artist = artist.split(';')
+                        artist = artist[0]
+                    if ',' in artist:
+                        artist = artist.split(',')
+                        artist = artist[0]
+                    break
+            self.artist_name1 = artist
+            self.song_name1 = title
+        except:
+            print("No name data...")
+            # Check if file has ID3 tags. If not, use the LastFM API for naming.
 
 #-----------------------------------------------------------------------------------------------------------------------#
 
