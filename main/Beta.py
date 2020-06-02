@@ -138,6 +138,9 @@ class Ultra(wx.Frame):
                 self.countListCttl = 0
 
                 try:
+                    self.curs.execute('DELETE FROM playlist;')
+                    self.conn.commit()
+                    self.countAddToPlaylist += 1
                     self.playlistBox.DeleteAllItems()
                     self.clearRecommendationBox()
                     self.loadFolder(pathname)
