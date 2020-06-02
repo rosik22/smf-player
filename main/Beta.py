@@ -42,6 +42,7 @@ class Scope(wx.Frame):
         self.SetBackgroundColour("Black")
         self.countListCttl = 0
         self.countAddToPlaylist = 0
+       # self.allPaths = {}
 
         # Playback panel
         self.panel = wx.Panel(self, size=(600, 100))
@@ -351,6 +352,9 @@ class Scope(wx.Frame):
         data.append(self.artist_name)
         data.append(song_year)
         data.append(path)
+
+        #self.allPaths[self.artist_name] = {}
+        #self.allPaths[self.artist_name][self.song_name]
 
         check = False
         if self.playlistBox.GetItemCount() > 0:
