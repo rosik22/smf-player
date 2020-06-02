@@ -105,20 +105,35 @@ class Scope(wx.Frame):
     def createMenu(self):
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
-        open1 = filemenu.Append(-1, "&Open")
-        add = filemenu.Append(-1, "&Add to playlist")
-        exit2 = filemenu.Append(-1, "&Exit")
+        openf = filemenu.Append(-1, '&Open folder')
+        open1 = filemenu.Append(-1, '&Open')
+        add = filemenu.Append(-1, '&Add to playlist')
+        exit2 = filemenu.Append(-1, '&Exit')
         menubar.Append(filemenu, '&File')
         self.SetMenuBar(menubar)
-        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 1), open1)
-        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 2), add)
-        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 3), exit2)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 1), openf)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 2), open1)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 3), add)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 4), exit2)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
     def menuhandler(self, num, event):
         id = event.GetId()
         if num == 1:
+            with wx.DirDialog(self.panel, "Open Music Dir", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as directory:
+
+                if directory.ShowModal() == wx.ID_CANCEL:
+                    return
+
+                pathname = directory.GetPath()
+
+                try:
+                    self.loadFolder(pathname)
+                except:
+                    print("Error during loading the path and/or files within...")
+
+        if num == 2:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
@@ -142,7 +157,7 @@ class Scope(wx.Frame):
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
-        elif num == 2:
+        elif num == 3:
             with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
@@ -167,7 +182,7 @@ class Scope(wx.Frame):
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
-        elif num == 3:
+        elif num == 4:
             self.Close()
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -209,8 +224,12 @@ class Scope(wx.Frame):
         songTitle = str(d[1])
 
         self.curs.execute(
-            '''SELECT path FROM playlist WHERE artist=? AND title=? ''', (artistName, songTitle))
+            '''SELECT path FROM playlist WHERE artist=? AND title=?''', (artistName, songTitle))
         path = ''.join(self.curs.fetchone())
+
+        self.curs.execute(
+            '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
+        timesplayed = int(self.curs.fetchone()[0])
 
         self.Player.Load(path)
         self.PlayerSlider.SetRange(0, self.Player.Length())
@@ -226,7 +245,7 @@ class Scope(wx.Frame):
                     found = True
                     print(recs[3])
                     break
-        if found is False:
+        if found is False and timesplayed < 1:
             try:
                 self.getSongRecommendation(songTitle, artistName)
                 # self.songrec(self.song_name, self.artist_name)
@@ -344,7 +363,7 @@ class Scope(wx.Frame):
                         artist = artist[0]
                     break
         except:
-            print("No data...")
+            print("No name data...")
         # Check if file has ID3 tags. If not, use the LastFM API for naming.
         try:
             audio = ID3(path)
@@ -383,6 +402,17 @@ class Scope(wx.Frame):
         if check == False:
             self.playlistd(data)
             self.fillPlaylistBox(data)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def loadFolder(self, path):
+        paths = []
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.lower().endswith(('.mp3', '.flac', '.wav', '.aac', 'ogg')):
+                    paths.append(os.path.join(root,file))
+                    
+        for x in paths:
+            self.getMutagenTags(x)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
@@ -555,7 +585,6 @@ class Scope(wx.Frame):
 
 
 #-----------------------------------------------------------------------------------------------------------------------#
-
 
     def songrec(self, track_name, artist_name):
         artist_url = ''
