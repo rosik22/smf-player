@@ -45,6 +45,7 @@ class Scope(wx.Frame):
         self.SetBackgroundColour("Black")
         self.countListCttl = 0
         self.countAddToPlaylist = 0
+       # self.allPaths = {}
 
         # Playback panel
         self.panel = wx.Panel(self, size=(600, 100))
@@ -98,6 +99,7 @@ class Scope(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def OnClose(self, e):
         self.conn.close()
+        self.Player.SetVolume(1.0)
         self.Destroy()
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -144,7 +146,7 @@ class Scope(wx.Frame):
 
                 pathname = file.GetPath()
                 self.countListCttl = 0
-
+                
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
@@ -196,9 +198,16 @@ class Scope(wx.Frame):
             self.Destroy()
             raise
 
-        self.PlayerSlider = wx.Slider(
-            self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(100, 10))
-        self.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
+        self.PlayerSlider = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(400,-1), pos=(100,10))
+        self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
+
+        # Slider for volume
+        self.currentVolume = 100
+        self.volumeCtrl = wx.Slider(self.panel, style=wx.SL_HORIZONTAL, size=(100,-1), pos=(400,40))
+        self.volumeCtrl.SetRange(0, 100)
+        self.volumeCtrl.SetValue(100)
+        self.Player.SetVolume(1.0)
+        self.volumeCtrl.Bind(wx.EVT_SLIDER, self.onVolume, self.volumeCtrl)
 
         # Sizer for different panels.
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -386,6 +395,9 @@ class Scope(wx.Frame):
         data.append(song_year)
         data.append(path)
 
+        #self.allPaths[self.artist_name] = {}
+        #self.allPaths[self.artist_name][self.song_name]
+
         check = False
         if self.playlistBox.GetItemCount() > 0:
             count = self.playlistBox.GetItemCount()
@@ -533,7 +545,7 @@ class Scope(wx.Frame):
                 # Search for album in spotify.
                 album_search = sp.search(
                     q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
-                print(album_search)
+                #print(album_search)
                 for album in album_search['albums']['items']:
                     album_name_sp = album['name']
                     if artist_name.lower() == str(album['artists'][0]['name']).lower():
@@ -594,7 +606,7 @@ class Scope(wx.Frame):
             for track in track_search['tracks']['items']:
                 artist_url = track['artists'][0]['id']
                 found = True
-                print(str(artist_url))
+               # print(str(artist_url))
                 break
 
             off += 50
@@ -661,6 +673,10 @@ class Scope(wx.Frame):
     def OnSeek(self, event):
         value = self.PlayerSlider.GetValue()
         self.Player.Seek(value)
+
+    def onVolume(self, event):
+        self.currentVolume = self.volumeCtrl.GetValue()
+        self.Player.SetVolume(self.currentVolume/100)
 
     def onTimer(self, event):
         value = self.Player.Tell()
