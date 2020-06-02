@@ -240,21 +240,22 @@ class Scope(wx.Frame):
             '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
         timesplayed = int(self.curs.fetchone()[0])
 
-        self.Player.Load(path)
-        self.PlayerSlider.SetRange(0, self.Player.Length())
-        self.Player.Play()
-        self.setTimesPlayed(path, row)
-        self.ButtonPlay.SetValue(True)
-        self.makeCover(songTitle, artistName, path)
-        found = False
-        for recs in self.recommendations:
-            for x in recs:
-                if artistName == x[3]:
-                    self.fillRecommendationBox(recs, artistName)
-                    found = True
-                    print(recs[3])
-                    break
-        if found is False and timesplayed < 1:
+        if os.path.isfile(path):
+            self.Player.Load(path)
+            self.PlayerSlider.SetRange(0, self.Player.Length())
+            self.Player.Play()
+            self.setTimesPlayed(path, row)
+            self.ButtonPlay.SetValue(True)
+            self.makeCover(songTitle, artistName, path)
+            found = False
+            for recs in self.recommendations:
+                for x in recs:
+                    if artistName == x[3]:
+                        self.fillRecommendationBox(recs, artistName)
+                        found = True
+                        print(recs[3])
+                        break
+            if found is False and timesplayed < 1:
                 try:
                     self.getSongRecommendationByAlbumArtist(songTitle, artistName)
                 except:
@@ -264,6 +265,39 @@ class Scope(wx.Frame):
                         self.songRecommendationByTrackArtist(songTitle, artistName)
                     except:
                         print("No recommendations for current title..")
+        else:
+            if os.name == 'nt':
+                p = path.rsplit('\\',1)
+            else:
+                p = path.rsplit('/',1)
+                
+            dirr = p[0]
+            songname = p[1]
+            currpath = ""
+            for root, dirs, files in os.walk(dirr):
+                for file in files:
+                    if file == songname:
+                        currpath = os.path.join(root, file)
+            if not currpath:
+                wx.MessageBox("The file is missing.",
+                          "ERROR", wx.ICON_ERROR | wx.OK)
+                self.playlistBox.DeleteItem(self.playlistBox.GetFocusedItem())
+                self.clearPanel()
+                self.curs.execute('''DELETE FROM playlist WHERE path=?''', (path,))
+                evt = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
+                wx.PostEvent(self.ButtonNext, evt)
+            else:
+                self.curs.execute('''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
+                self.conn.commit()
+                self.loadSong(row)
+                
+#-----------------------------------------------------------------------------------------------------------------------#
+    def clearPanel(self):
+        self.Player.Stop()
+        self.PlayerSlider.SetValue(0)
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(300, 300)))
+        self.ButtonPlay.SetValue(False)
+
 #-----------------------------------------------------------------------------------------------------------------------#
 
     def loadSongFromRecommendationBox(self, e):
@@ -392,9 +426,6 @@ class Scope(wx.Frame):
         data.append(self.artist_name)
         data.append(song_year)
         data.append(path)
-
-        #self.allPaths[self.artist_name] = {}
-        #self.allPaths[self.artist_name][self.song_name]
 
         check = False
         if self.playlistBox.GetItemCount() > 0:
