@@ -64,10 +64,11 @@ class Ultra(wx.Frame):
         self.plbox = wx.Panel(self, size=(600, 500))
         self.playlistBox = wx.ListCtrl(self.plbox, size=(
             550, 425), pos=(25, 10), style=wx.LC_REPORT)
-        self.playlistBox.AppendColumn("Artist", width=150)
-        self.playlistBox.AppendColumn("Title", width=150)
-        self.playlistBox.AppendColumn("Duration", width=125)
-        self.playlistBox.AppendColumn("Counter", width=125)
+        self.playlistBox.AppendColumn("Artist", width=170)
+        self.playlistBox.AppendColumn("Title", width=170)
+        self.playlistBox.AppendColumn("Duration", width=70)
+        self.playlistBox.AppendColumn("Counter", width=70)
+        self.playlistBox.AppendColumn("Rating", width=70)
         self.playlistBox.SetBackgroundColour("Light grey")
         self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
@@ -210,8 +211,8 @@ class Ultra(wx.Frame):
 
         #filter
         filters = ['Artist', 'Title']
-        self.combo = wx.ComboBox(self.plbox, choices=filters, pos=(250,450))
-        self.enterPref = wx.TextCtrl(self.plbox, size=(100,35), pos=(100,450))
+        self.combo = wx.ComboBox(self.plbox, choices=filters, pos=(355,450))
+        self.enterPref = wx.TextCtrl(self.plbox, size=(100,34), pos=(245,450))
 
         # Slider for volume
         self.currentVolume = 100
@@ -371,7 +372,12 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def Buttons(self):
-        self.FilterBtn = wx.Button(self.plbox, label="Filter", size=(100,30), pos=(400,453))
+        self.FilterBtn = wx.Button(self.plbox, label="Filter", size=(100,30), pos=(475,453))
+
+        choices=['1','2','3','4','5']
+        self.RatingBtns = wx.RadioBox(self.plbox, -1, "Rating", pos=(25,440), 
+                    size=(180,45), choices=choices ,style=wx.RA_HORIZONTAL)
+        self.RatingBtns.SetForegroundColour((40, 40, 40))
 
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
         picPlayBtn = self.scaleBitmap(picPlayBtn)
@@ -396,6 +402,7 @@ class Ultra(wx.Frame):
         self.ButtonNext.Bind(wx.EVT_BUTTON, self.OnNext)
 
         self.FilterBtn.Bind(wx.EVT_BUTTON, self.onFilter)
+        self.RatingBtns.Bind(wx.EVT_RADIOBOX, self.onRate)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def getMutagenTags(self, path):
@@ -481,6 +488,7 @@ class Ultra(wx.Frame):
         self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
         self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
         self.playlistBox.SetItem(self.countListCttl, 3, str(0))
+        self.playlistBox.SetItem(self.countListCttl, 4, str(0))
         self.countListCttl += 1
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -517,14 +525,15 @@ class Ultra(wx.Frame):
                             artist VARCHAR(255),
                             year VARCHAR(255),
                             path VARCHAR(255),
-                            timesplayed VARCHAR(255))''')
+                            timesplayed VARCHAR(255),
+                            rating VARCHAR(255))''')
         self.curs.execute('DELETE FROM playlist;')
         self.conn.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def playlistd(self, data):
-        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed) 
-                    VALUES(?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0))
+        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed,rating) 
+                    VALUES(?,?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0, 0))
         self.conn.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -761,8 +770,41 @@ class Ultra(wx.Frame):
         self.Player.SetVolume(self.currentVolume/100)
 
     def onFilter(self, event):
-        print(self.GetPosition())
+        txt = self.enterPref.GetValue()
+        idxsel = self.combo.GetCurrentSelection()
+        sel = self.combo.GetString(idxsel)
+        if sel == "Artist":
+            rows = self.playlistBox.GetItemCount()
+            row = 0
+            while row < rows:
+                item = self.playlistBox.GetItem(itemIdx=row, col=0)
+                if item.GetText().lower() != txt.lower():
+                    self.playlistBox.DeleteItem(row)
+                    rows -= 1
+                    row -= 1
+                row += 1
 
+        elif sel == "Title":
+            rows = self.playlistBox.GetItemCount()
+            row = 0
+            while row < rows:
+                item = self.playlistBox.GetItem(itemIdx=row, col=1)
+                if item.GetText().lower() != txt.lower():
+                    self.playlistBox.DeleteItem(row)
+                    rows -= 1
+                    row -= 1
+                row += 1
+
+        self.clearPanel()
+        
+
+    def onRate(self, event):
+        cur = self.playlistBox.GetFocusedItem()
+        item = self.playlistBox.GetItem(itemIdx=cur)
+        self.playlistBox.SetItem(cur, 4, event.GetString())
+        self.curs.execute('''UPDATE playlist SET rating=? WHERE artist=?''', (event.GetString(), item.GetText()))
+        self.conn.commit()
+        
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
