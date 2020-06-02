@@ -543,7 +543,7 @@ class Scope(wx.Frame):
                 # Search for album in spotify.
                 album_search = sp.search(
                     q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
-                print(album_search)
+                #print(album_search)
                 for album in album_search['albums']['items']:
                     album_name_sp = album['name']
                     if artist_name.lower() == str(album['artists'][0]['name']).lower():
@@ -604,7 +604,7 @@ class Scope(wx.Frame):
             for track in track_search['tracks']['items']:
                 artist_url = track['artists'][0]['id']
                 found = True
-                print(str(artist_url))
+               # print(str(artist_url))
                 break
 
             off += 50
