@@ -31,6 +31,7 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 # Currently loaded songs.
 currentpl = 'playing.db'
+ratingdb = 'rating.db'
 
 
 class Ultra(wx.Frame):
@@ -42,6 +43,7 @@ class Ultra(wx.Frame):
             None, title="smf-player", style=no_resize, size=(1300, 800), pos=(0, 0))
 
         self.establishConnectionRun()
+        self.establishConnectionRating()
 
         self.SetBackgroundColour("Black")
         self.countListCttl = 0
@@ -72,6 +74,7 @@ class Ultra(wx.Frame):
         self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
+      #  self.playlistBox.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.onKey)
 
         self.plbox.SetBackgroundColour("White")
 
@@ -560,6 +563,7 @@ class Ultra(wx.Frame):
                     break
 
         if check == False:
+            self.playlistrate(data)
             self.playlistd(data)
             self.fillPlaylistBox(data)
 
@@ -574,9 +578,9 @@ class Ultra(wx.Frame):
         try:
             for x in paths:
                 self.getMutagenTags(x)
-         #   self.playlistBox.SetItemState(
-          #              0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
-           # self.playlistBox.Select(0, on=1)
+            self.playlistBox.SetItemState(
+                        0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+            self.playlistBox.Select(0, on=1)
         except:
             print("Mutagen error..")
 
@@ -591,11 +595,17 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
         list1 = (data[2], data[0], data[1])
+        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(list1[0]),str(list1[1])))
+        rate = str(self.curs2.fetchone()[0])
+        
         self.playlistBox.InsertItem(self.countListCttl, list1[0])
         self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
         self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
         self.playlistBox.SetItem(self.countListCttl, 3, str(0))
-        self.playlistBox.SetItem(self.countListCttl, 4, str(0))
+        if rate == "None":
+            self.playlistBox.SetItem(self.countListCttl, 4, str(0))
+        else:
+            self.playlistBox.SetItem(self.countListCttl, 4, str(rate))
         self.countListCttl += 1
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -623,6 +633,32 @@ class Ultra(wx.Frame):
 
         self.curs = self.conn.cursor()
         self.createTableRunning()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def establishConnectionRating(self):
+        self.conn2 = None
+        try:
+            self.conn2 = sqlite3.connect(ratingdb)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
+
+        self.curs2 = self.conn2.cursor()
+        self.createTableRating()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def createTableRating(self):
+        self.curs2.execute('''CREATE TABLE IF NOT EXISTS rate
+                            (title VARCHAR(255) UNIQUE,
+                            artist VARCHAR(255),
+                            rating VARCHAR(255))''')
+        self.conn2.commit()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def playlistrate(self, data):
+        self.curs2.execute('''REPLACE INTO rate(title, artist, rating) 
+                    VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0],data[2],data[0],data[2]))
+        self.conn2.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def establishConnectionPl(self, path):
@@ -898,9 +934,13 @@ class Ultra(wx.Frame):
             rows = self.playlistBox.GetItemCount()
             row = 0
             while row < rows:
+                title = self.playlistBox.GetItem(itemIdx=row, col=1)
                 item = self.playlistBox.GetItem(itemIdx=row, col=0)
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
+                    self.curs.execute(
+                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(),title.GetText()))
+                    self.conn.commit()
                     rows -= 1
                     row -= 1
                 row += 1
@@ -909,9 +949,12 @@ class Ultra(wx.Frame):
             rows = self.playlistBox.GetItemCount()
             row = 0
             while row < rows:
+                artist = self.playlistBox.GetItem(itemIdx=row, col=0)
                 item = self.playlistBox.GetItem(itemIdx=row, col=1)
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
+                    self.curs.execute('''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),item.GetText()))
+                    self.conn.commit()
                     rows -= 1
                     row -= 1
                 row += 1
@@ -920,8 +963,22 @@ class Ultra(wx.Frame):
 
     def onRate(self, event):
         cur = self.playlistBox.GetFocusedItem()
-        item = self.playlistBox.GetItem(itemIdx=cur)
+        artist = self.playlistBox.GetItem(itemIdx=cur, col=0)
+        title = self.playlistBox.GetItem(itemIdx=cur, col=1)
         self.playlistBox.SetItem(cur, 4, event.GetString())
+        rate = event.GetString()
+        self.curs2.execute('''UPDATE rate SET rating=? WHERE artist=? AND title=?''', (rate, artist.GetText(), title.GetText()))
+        self.conn2.commit()
+
+    """ def onKey(self, event):
+        cur = self.playlistBox.GetFocusedItem()
+        self.playlistBox.DeleteItem(cur)
+        artist = self.playlistBox.GetItem(itemIdx=cur, col=0)
+        title = self.playlistBox.GetItem(itemIdx=cur, col=1)
+        self.curs.execute(
+                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),title.GetText()))
+        self.conn.commit() """
+
 
     def onTimer(self, event):
         value = self.Player.Tell()
