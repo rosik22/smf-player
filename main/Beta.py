@@ -30,7 +30,6 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 # Currently loaded songs.
 currentpl = 'playing.db'
-recommendation_data = 'rec.db'
 
 
 class Ultra(wx.Frame):
@@ -39,14 +38,13 @@ class Ultra(wx.Frame):
         no_resize = wx.DEFAULT_FRAME_STYLE & ~ (wx.RESIZE_BORDER |
                                                 wx.MAXIMIZE_BOX)
         super().__init__(
-            None, title="Ultra", style=no_resize, size=(1300, 800), pos=(0, 0))
+            None, title="smf-player", style=no_resize, size=(1300, 800), pos=(0, 0))
 
         self.establishConnectionRun()
 
         self.SetBackgroundColour("Black")
         self.countListCttl = 0
         self.countAddToPlaylist = 0
-       # self.allPaths = {}
 
         # Playback panel
         self.panel = wx.Panel(self, size=(700, 200))
@@ -128,6 +126,7 @@ class Ultra(wx.Frame):
     # Function to handle menubar options.
     def menuhandler(self, num, event):
         id = event.GetId()
+        # Load folder.
         if num == 1:
             with wx.DirDialog(self.panel, "Open Music Dir", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as directory:
 
@@ -147,6 +146,7 @@ class Ultra(wx.Frame):
                 except:
                     print("Error during loading the path and/or files within...")
 
+        # Open file and clear playlist.
         if num == 2:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
@@ -171,6 +171,7 @@ class Ultra(wx.Frame):
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
+        # Add file or files to playlist.
         elif num == 3:
             with wx.FileDialog(self.panel, "Add music file to playlist", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as file:
@@ -217,6 +218,7 @@ class Ultra(wx.Frame):
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
 
+        # Close application.
         elif num == 4:
             self.Close()
 
