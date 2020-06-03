@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import wx
 import wx.media
 import os
@@ -33,7 +32,6 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 currentpl = 'playing.db'
 ratingdb = 'rating.db'
 
-
 class Ultra(wx.Frame):
     def __init__(self, parent, id):
 
@@ -42,6 +40,7 @@ class Ultra(wx.Frame):
         super().__init__(
             None, title="smf-player", style=no_resize, size=(1300, 800), pos=(0, 0))
 
+        # establish connection with the databases
         self.establishConnectionRun()
         self.establishConnectionRating()
 
@@ -63,6 +62,8 @@ class Ultra(wx.Frame):
 
         # Panel for playlist listbox and filter options.
         self.plbox = wx.Panel(self, size=(600, 500))
+        self.plbox.SetBackgroundColour("White")
+        # listctrl for the loaded songs
         self.playlistBox = wx.ListCtrl(self.plbox, size=(
             550, 425), pos=(25, 10), style=wx.LC_REPORT)
         self.playlistBox.AppendColumn("Artist", width=170)
@@ -74,12 +75,11 @@ class Ultra(wx.Frame):
         self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
-      #  self.playlistBox.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.onKey)
-
-        self.plbox.SetBackgroundColour("White")
 
         # Panel for song recommendations.
         self.rec = wx.Panel(self, size=(600, 300))
+        self.rec.SetBackgroundColour("White")
+        # listctrl for the recomended songs
         self.recBox = wx.ListCtrl(self.rec, size=(
             550, 220), pos=(25, 0), style=wx.LC_REPORT)
         self.recBox.AppendColumn("Artist", width=200)
@@ -90,8 +90,6 @@ class Ultra(wx.Frame):
         self.recommendations = []
         self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                          self.loadSongFromRecommendationBox)
-        self.rec.SetBackgroundColour("White")
-        self.recommendations = []
 
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
