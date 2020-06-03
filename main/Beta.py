@@ -71,6 +71,7 @@ class Ultra(wx.Frame):
         self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
+        self.playlistBox.Bind(wx.EVT_LIST_BEGIN_DRAG, self.onDrag)
 
         self.plbox.SetBackgroundColour("White")
 
@@ -141,6 +142,7 @@ class Ultra(wx.Frame):
                     self.conn.commit()
                     self.countAddToPlaylist += 1
                     self.playlistBox.DeleteAllItems()
+                    self.clearPanel()
                     self.clearRecommendationBox()
                     self.loadFolder(pathname)
                 except:
@@ -266,7 +268,7 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
-        row = e.GetEventObject().GetFocusedItem()
+        row = self.playlistBox.GetFocusedItem()
         self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -509,6 +511,9 @@ class Ultra(wx.Frame):
         try:
             for x in paths:
                 self.getMutagenTags(x)
+            self.playlistBox.SetItemState(
+                        0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+            self.playlistBox.Select(0, on=1)
         except:
             print("Mutagen error..")
 
@@ -846,6 +851,9 @@ class Ultra(wx.Frame):
         self.curs.execute('''UPDATE playlist SET rating=? WHERE artist=?''',
                           (event.GetString(), item.GetText()))
         self.conn.commit()
+
+    def onDrag(self, event):
+        print("drag")
 
     def onTimer(self, event):
         value = self.Player.Tell()
