@@ -23,6 +23,7 @@ from xml.dom.minidom import parseString
 from PIL import Image
 from functools import partial
 from io import BytesIO
+from shutil import copyfile
 
 os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
 os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
@@ -115,6 +116,8 @@ class Ultra(wx.Frame):
         open1 = filemenu.Append(-1, '&Open')
         openf = filemenu.Append(-1, '&Open folder')
         add = filemenu.Append(-1, '&Add to playlist')
+        openpl = filemenu.Append(-1, '&Open Playlist')
+        savepl = filemenu.Append(-1, '&Save Playlist')
         exit2 = filemenu.Append(-1, '&Exit')
         menubar.Append(filemenu, '&File')
         self.SetMenuBar(menubar)
@@ -122,6 +125,8 @@ class Ultra(wx.Frame):
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 2), open1)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 3), add)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 4), exit2)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 5), savepl)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 6), openpl)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
@@ -149,7 +154,7 @@ class Ultra(wx.Frame):
                     print("Error during loading the path and/or files within...")
 
         # Open file and clear playlist.
-        if num == 2:
+        elif num == 2:
             with wx.FileDialog(self.panel, "Open Music file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
                                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
@@ -224,8 +229,65 @@ class Ultra(wx.Frame):
         elif num == 4:
             self.Close()
 
+        elif num == 5:
+            with wx.FileDialog(self.panel, "Save playlist", wildcard="Playlist file (*.db)|*.db", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file:
+
+                if file.ShowModal() == wx.ID_CANCEL:
+                    return
+
+                if self.playlistBox.GetItemCount() >= 1:
+                    savedfile = file.GetPath()
+                    currfile = copyfile('playing.db', savedfile)
+
+        elif num == 6:
+            with wx.FileDialog(self.panel, "Open playlist file", wildcard="Playlist files (*.db)|*.db", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
+
+                if file.ShowModal() == wx.ID_CANCEL:
+                    return
+
+                pathname = file.GetPath()
+                self.playlistBox.DeleteAllItems()
+                self.clearRecommendationBox()
+                self.countListCttl = 0
+                self.countAddToPlaylist = 0
+                self.establishConnectionPl(pathname)
+                pathnames = self.loadPlaylist()
+
+                if len(pathnames) == 1:
+                    try:
+                        if self.Player.Length() == -1:
+                            self.Player.Load(pathname)
+                        self.getMutagenTags(pathname)
+                        if self.playlistBox.GetItemCount() == 1:
+                            self.playlistBox.SetItemState(
+                                0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                            self.playlistBox.Select(0, on=1)
+                        if self.countAddToPlaylist < 1:
+                            self.makeCover(
+                                self.song_name, self.artist_name, pathname)
+                            self.countAddToPlaylist += 1
+                        self.PlayerSlider.SetRange(0, self.Player.Length())
+                    except IOError:
+                        wx.LogError("Cannot open file '%s'." % pathname)
+                elif len(pathnames) > 1:
+                    try:
+                        self.loadFiles(pathnames)
+                        self.makeCover(
+                            self.song_name, self.artist_name, pathnames[0])
+                        self.playlistBox.SetItemState(
+                            0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                        self.playlistBox.Select(0, on=1)
+                        self.countAddToPlaylist += 1
+                        if self.Player.Length() == -1:
+                            self.Player.Load(pathname)
+                            self.countAddToPlaylist += 1
+                        self.PlayerSlider.SetRange(0, self.Player.Length())
+                    except IOError:
+                        wx.LogError("Cannot open file '%s'." % pathname)
+
 #-----------------------------------------------------------------------------------------------------------------------#
     # Sets the layout
+
     def createLayout(self):
         try:
             self.Player = wx.media.MediaCtrl(self, style=wx.SIMPLE_BORDER)
@@ -354,6 +416,13 @@ class Ultra(wx.Frame):
                     '''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
                 self.conn.commit()
                 self.loadSong(row)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def loadPlaylist(self):
+        self.curs1.row_factory = lambda cursor, row: row[0]
+        self.curs1.execute('''SELECT path FROM playlist''')
+        data = self.curs1.fetchall()
+        return data
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def clearPanel(self):
@@ -560,6 +629,17 @@ class Ultra(wx.Frame):
 
         self.curs = self.conn.cursor()
         self.createTableRunning()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    def establishConnectionPl(self, path):
+        self.conn1 = None
+        try:
+            self.conn1 = sqlite3.connect(path)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
+
+        self.curs1 = self.conn1.cursor()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def createTableRunning(self):
