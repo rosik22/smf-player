@@ -70,13 +70,13 @@ class Ultra(wx.Frame):
         self.playlistBox.AppendColumn("Duration", width=70)
         self.playlistBox.AppendColumn("Counter", width=70)
         self.playlistBox.AppendColumn("Rating", width=70)
-        self.playlistBox.SetBackgroundColour("Light grey")
-        self.playlistBox.SetTextColour("Black")
+        self.playlistBox.SetBackgroundColour("Black")
+        self.playlistBox.SetTextColour("White")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
       #  self.playlistBox.Bind(wx.EVT_LIST_ITEM_RIGHT_CLICK, self.onKey)
 
-        self.plbox.SetBackgroundColour("White")
+        self.plbox.SetBackgroundColour("SALMON")
 
         # Panel for song recommendations.
         self.rec = wx.Panel(self, size=(600, 300))
@@ -85,12 +85,11 @@ class Ultra(wx.Frame):
         self.recBox.AppendColumn("Artist", width=200)
         self.recBox.AppendColumn("Title", width=200)
         self.recBox.AppendColumn("Duration", width=150)
-        self.recBox.SetBackgroundColour("Light grey")
-        self.recBox.SetTextColour("Black")
-        self.recommendations = []
+        self.recBox.SetBackgroundColour("Black")
+        self.recBox.SetTextColour("White")
         self.recBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                          self.loadSongFromRecommendationBox)
-        self.rec.SetBackgroundColour("White")
+        self.rec.SetBackgroundColour("SALMON")
         self.recommendations = []
 
         self.timer = wx.Timer(self)
@@ -234,6 +233,10 @@ class Ultra(wx.Frame):
 
                 if self.playlistBox.GetItemCount() >= 1:
                     savedfile = file.GetPath()
+                    savedfile1 = os.path.split(savedfile)
+                    savedfile1 = savedfile1[-1]
+                    if '.' not in savedfile1:
+                        savedfile += '.db'
                     currfile = copyfile('playing.db', savedfile)
 
         elif num == 6:
@@ -361,26 +364,32 @@ class Ultra(wx.Frame):
 
             except:
                 print("No name data from LastFM")
-            self.makeCover(songTitle, artistName, path)
-            found = False
-            for recs in self.recommendations:
-                for x in recs:
-                    if artistName == x[3]:
-                        self.fillRecommendationBox(recs, artistName)
-                        found = True
-                        print(recs[3])
-                        break
-            if found is False and timesplayed < 1:
-                try:
-                    self.songRecommendationByTrackArtist(songTitle, artistName)
-                except:
-                    print("No recommendations by Album/Artist...")
-                    print("Trying long query by Track/Artist...")
+                print(songTitle + artistName)
+            try:
+                self.makeCover(songTitle, artistName, path)
+                found = False
+                for recs in self.recommendations:
+                    for x in recs:
+                        if artistName == x[3]:
+                            self.fillRecommendationBox(recs, artistName)
+                            found = True
+                            print(recs[3])
+                            break
+                if found is False and timesplayed < 1:
                     try:
                         self.songRecommendationByTrackArtist(
                             songTitle, artistName)
                     except:
-                        print("No recommendations for current title..")
+                        print("No recommendations by Album/Artist...")
+                        print("Trying long query by Track/Artist...")
+                        try:
+                            self.songRecommendationByTrackArtist(
+                                songTitle, artistName)
+                        except:
+                            print("No recommendations for current title..")
+            except:
+                print("No data could be loaded for the song.")
+
         else:
             if os.name == 'nt':
                 p = path.rsplit('\\', 1)
@@ -576,7 +585,7 @@ class Ultra(wx.Frame):
             for x in paths:
                 self.getMutagenTags(x)
             self.playlistBox.SetItemState(
-                        0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
             self.playlistBox.Select(0, on=1)
         except:
             print("Mutagen error..")
@@ -592,9 +601,10 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
         list1 = (data[2], data[0], data[1])
-        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(list1[0]),str(list1[1])))
+        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
+            list1[0]), str(list1[1])))
         rate = str(self.curs2.fetchone()[0])
-        
+
         self.playlistBox.InsertItem(self.countListCttl, list1[0])
         self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
         self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
@@ -653,8 +663,8 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def playlistrate(self, data):
-        self.curs2.execute('''REPLACE INTO rate(title, artist, rating) 
-                    VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0],data[2],data[0],data[2]))
+        self.curs2.execute('''REPLACE INTO rate(title, artist, rating)
+                    VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0], data[2], data[0], data[2]))
         self.conn2.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -683,7 +693,7 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def playlistd(self, data):
-        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed,rating) 
+        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed,rating)
                     VALUES(?,?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0, 0))
         self.conn.commit()
 
@@ -693,26 +703,20 @@ class Ultra(wx.Frame):
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
+        # try:
+        link = urllib.request.urlopen(url)
+        parsed = json.load(link)
         try:
-            link = urllib.request.urlopen(url)
-            parsed = json.load(link)
-            try:
-                tags = ID3(path)
-                filename = tags.get("APIC:").data
-                image = Image.open(BytesIO(filename))
-                self.displayimage(image)
-            except:
-                try:
-                    imagelinks = parsed['track']['album']['image']
-                    imagelink = imagelinks[3]['#text']
-                    filename = urllib.request.urlopen(imagelink)
-                    image = Image.open(filename)
-                    self.displayimage(image)
-                except:
-                    print(
-                        "No album cover could be loaded for the given song from LastFM.")
+            tags = ID3(path)
+            filename = tags.get("APIC:").data
+            image = Image.open(BytesIO(filename))
+            self.displayimage(image)
         except:
-            print("No internet connection.")
+            imagelinks = parsed['track']['album']['image']
+            imagelink = imagelinks[3]['#text']
+            filename = urllib.request.urlopen(imagelink)
+            image = Image.open(filename)
+            self.displayimage(image)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, image):
@@ -804,7 +808,6 @@ class Ultra(wx.Frame):
 
 
 #-----------------------------------------------------------------------------------------------------------------------#
-
 
     def songRecommendationByTrackArtist(self, track_name, artist_name):
         artist_url = ''
@@ -944,7 +947,7 @@ class Ultra(wx.Frame):
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
                     self.curs.execute(
-                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(),title.GetText()))
+                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(), title.GetText()))
                     self.conn.commit()
                     rows -= 1
                     row -= 1
@@ -958,7 +961,7 @@ class Ultra(wx.Frame):
                 item = self.playlistBox.GetItem(itemIdx=row, col=1)
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
-                    self.curs.execute('''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),item.GetText()))
+                    self.curs.execute('''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(), item.GetText()))
                     self.conn.commit()
                     rows -= 1
                     row -= 1
@@ -972,7 +975,8 @@ class Ultra(wx.Frame):
         title = self.playlistBox.GetItem(itemIdx=cur, col=1)
         self.playlistBox.SetItem(cur, 4, event.GetString())
         rate = event.GetString()
-        self.curs2.execute('''UPDATE rate SET rating=? WHERE artist=? AND title=?''', (rate, artist.GetText(), title.GetText()))
+        self.curs2.execute('''UPDATE rate SET rating=? WHERE artist=? AND title=?''',
+                           (rate, artist.GetText(), title.GetText()))
         self.conn2.commit()
 
     """ def onKey(self, event):
@@ -983,7 +987,6 @@ class Ultra(wx.Frame):
         self.curs.execute(
                     '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),title.GetText()))
         self.conn.commit() """
-
 
     def onTimer(self, event):
         value = self.Player.Tell()
