@@ -172,14 +172,17 @@ class Ultra(wx.Frame):
                     wx.LogError("Cannot open file '%s'." % pathname)
 
         elif num == 3:
-            with wx.FileDialog(self.panel, "Open Image file", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
-                               style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
+            with wx.FileDialog(self.panel, "Add music file to playlist", wildcard="Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac",
+                               style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE) as file:
 
                 if file.ShowModal() == wx.ID_CANCEL:
                     return
 
                 pathname = file.GetPath()
-
+                pathnames = file.GetPaths()
+                print(pathnames)
+                print(pathname)
+            if len(pathnames) == 1:
                 try:
                     if self.Player.Length() == -1:
                         self.Player.Load(pathname)
@@ -188,6 +191,24 @@ class Ultra(wx.Frame):
                         self.playlistBox.SetItemState(
                             0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                         self.playlistBox.Select(0, on=1)
+                    if self.countAddToPlaylist < 1:
+                        self.makeCover(
+                            self.song_name, self.artist_name, pathname)
+                        self.countAddToPlaylist += 1
+                    self.PlayerSlider.SetRange(0, self.Player.Length())
+                except IOError:
+                    wx.LogError("Cannot open file '%s'." % pathname)
+            elif len(pathnames) > 1:
+                try:
+                    if self.playlistBox.GetItemCount() == 0:
+                        self.loadFiles(pathnames)
+                        self.playlistBox.SetItemState(
+                            0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                        self.playlistBox.Select(0, on=1)
+                    if self.Player.Length() == -1:
+                        self.Player.Load(pathname)
+                    if self.playlistBox.GetItemCount() >= 1:
+                        self.loadFiles(pathnames)
                     if self.countAddToPlaylist < 1:
                         self.makeCover(
                             self.song_name, self.artist_name, pathname)
@@ -212,10 +233,11 @@ class Ultra(wx.Frame):
             self.panel, style=wx.SL_HORIZONTAL, size=(400, -1), pos=(150, 10))
         self.PlayerSlider.Bind(wx.EVT_SLIDER, self.OnSeek, self.PlayerSlider)
 
-        #filter
+        # filter
         filters = ['Artist', 'Title']
-        self.combo = wx.ComboBox(self.plbox, choices=filters, pos=(355,450))
-        self.enterPref = wx.TextCtrl(self.plbox, size=(100,34), pos=(245,450))
+        self.combo = wx.ComboBox(self.plbox, choices=filters, pos=(355, 450))
+        self.enterPref = wx.TextCtrl(
+            self.plbox, size=(100, 34), pos=(245, 450))
 
         # Slider for volume
         self.currentVolume = 100
@@ -257,7 +279,6 @@ class Ultra(wx.Frame):
         artistName = str(d[0])
         songTitle = str(d[1])
 
-
         self.curs.execute(
             '''SELECT path FROM playlist WHERE artist=? AND title=?''', (artistName, songTitle))
         path = ''.join(self.curs.fetchone())
@@ -272,7 +293,7 @@ class Ultra(wx.Frame):
             self.Player.Play()
             self.setTimesPlayed(path, row)
             self.ButtonPlay.SetValue(True)
-            if artistName == 'n/a':
+            if artistName == '':
                 self.getNamesLastFM(path)
             try:
 
@@ -297,15 +318,16 @@ class Ultra(wx.Frame):
                     print("No recommendations by Album/Artist...")
                     print("Trying long query by Track/Artist...")
                     try:
-                        self.songRecommendationByTrackArtist(songTitle, artistName)
+                        self.songRecommendationByTrackArtist(
+                            songTitle, artistName)
                     except:
                         print("No recommendations for current title..")
         else:
             if os.name == 'nt':
-                p = path.rsplit('\\',1)
+                p = path.rsplit('\\', 1)
             else:
-                p = path.rsplit('/',1)
-                
+                p = path.rsplit('/', 1)
+
             dirr = p[0]
             songname = p[1]
             currpath = ""
@@ -315,17 +337,20 @@ class Ultra(wx.Frame):
                         currpath = os.path.join(root, file)
             if not currpath:
                 wx.MessageBox("The file is missing.",
-                          "ERROR", wx.ICON_ERROR | wx.OK)
+                              "ERROR", wx.ICON_ERROR | wx.OK)
                 self.playlistBox.DeleteItem(self.playlistBox.GetFocusedItem())
                 self.clearPanel()
-                self.curs.execute('''DELETE FROM playlist WHERE path=?''', (path,))
-                evt = wx.CommandEvent(wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
+                self.curs.execute(
+                    '''DELETE FROM playlist WHERE path=?''', (path,))
+                evt = wx.CommandEvent(
+                    wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
                 wx.PostEvent(self.ButtonNext, evt)
             else:
-                self.curs.execute('''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
+                self.curs.execute(
+                    '''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
                 self.conn.commit()
                 self.loadSong(row)
-                
+
 #-----------------------------------------------------------------------------------------------------------------------#
     def clearPanel(self):
         self.Player.Stop()
@@ -375,11 +400,12 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def Buttons(self):
-        self.FilterBtn = wx.Button(self.plbox, label="Filter", size=(100,30), pos=(475,453))
+        self.FilterBtn = wx.Button(
+            self.plbox, label="Filter", size=(100, 30), pos=(475, 453))
 
-        choices=['1','2','3','4','5']
-        self.RatingBtns = wx.RadioBox(self.plbox, -1, "Rating", pos=(25,440), 
-                    size=(180,45), choices=choices ,style=wx.RA_HORIZONTAL)
+        choices = ['1', '2', '3', '4', '5']
+        self.RatingBtns = wx.RadioBox(self.plbox, -1, "Rating", pos=(25, 440),
+                                      size=(180, 45), choices=choices, style=wx.RA_HORIZONTAL)
         self.RatingBtns.SetForegroundColour((40, 40, 40))
 
         picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
@@ -419,7 +445,7 @@ class Ultra(wx.Frame):
                 rate = file.getframerate()
                 self.d = frames / float(rate)
         title = 'n/a'
-        artist = 'n/a'
+        artist = ''
         backup_name = os.path.split(path)
         backup_name = backup_name[-1]
         backup_name = backup_name.split('.')
@@ -485,6 +511,14 @@ class Ultra(wx.Frame):
             print("Mutagen error..")
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    def loadFiles(self, paths):
+        try:
+            for file in paths:
+                self.getMutagenTags(file)
+        except:
+            print("Could not load multiple files..")
+
+#-----------------------------------------------------------------------------------------------------------------------#
     def fillPlaylistBox(self, data):
         list1 = (data[2], data[0], data[1])
         self.playlistBox.InsertItem(self.countListCttl, list1[0])
@@ -545,24 +579,26 @@ class Ultra(wx.Frame):
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
-        # print(url)
-        link = urllib.request.urlopen(url)
-        parsed = json.load(link)
         try:
-            tags = ID3(path)
-            filename = tags.get("APIC:").data
-            image = Image.open(BytesIO(filename))
-            self.displayimage(image)
-        except:
+            link = urllib.request.urlopen(url)
+            parsed = json.load(link)
             try:
-                imagelinks = parsed['track']['album']['image']
-                imagelink = imagelinks[3]['#text']
-                filename = urllib.request.urlopen(imagelink)
-                image = Image.open(filename)
+                tags = ID3(path)
+                filename = tags.get("APIC:").data
+                image = Image.open(BytesIO(filename))
                 self.displayimage(image)
             except:
-                print(
-                    "No album cover could be loaded for the given song from LastFM.")
+                try:
+                    imagelinks = parsed['track']['album']['image']
+                    imagelink = imagelinks[3]['#text']
+                    filename = urllib.request.urlopen(imagelink)
+                    image = Image.open(filename)
+                    self.displayimage(image)
+                except:
+                    print(
+                        "No album cover could be loaded for the given song from LastFM.")
+        except:
+            print("No internet connection.")
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, image):
@@ -651,6 +687,7 @@ class Ultra(wx.Frame):
 
 
 #-----------------------------------------------------------------------------------------------------------------------#
+
 
     def songRecommendationByTrackArtist(self, track_name, artist_name):
         artist_url = ''
@@ -799,15 +836,15 @@ class Ultra(wx.Frame):
                 row += 1
 
         self.clearPanel()
-        
 
     def onRate(self, event):
         cur = self.playlistBox.GetFocusedItem()
         item = self.playlistBox.GetItem(itemIdx=cur)
         self.playlistBox.SetItem(cur, 4, event.GetString())
-        self.curs.execute('''UPDATE playlist SET rating=? WHERE artist=?''', (event.GetString(), item.GetText()))
+        self.curs.execute('''UPDATE playlist SET rating=? WHERE artist=?''',
+                          (event.GetString(), item.GetText()))
         self.conn.commit()
-        
+
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
@@ -818,6 +855,7 @@ class Ultra(wx.Frame):
                     current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
                 self.playlistBox.Select(current+1, on=1)
+
 
 app = wx.App()
 frame = Ultra(None, -1)
