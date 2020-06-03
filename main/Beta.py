@@ -190,8 +190,6 @@ class Ultra(wx.Frame):
                 print(pathname)
             if len(pathnames) == 1:
                 try:
-                    if self.Player.Length() == -1:
-                        self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
                     if self.playlistBox.GetItemCount() == 1:
                         self.playlistBox.SetItemState(
@@ -211,8 +209,6 @@ class Ultra(wx.Frame):
                         self.playlistBox.SetItemState(
                             0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                         self.playlistBox.Select(0, on=1)
-                    if self.Player.Length() == -1:
-                        self.Player.Load(pathname)
                     if self.playlistBox.GetItemCount() >= 1:
                         self.loadFiles(pathnames)
                     if self.countAddToPlaylist < 1:
@@ -253,8 +249,6 @@ class Ultra(wx.Frame):
 
                 if len(pathnames) == 1:
                     try:
-                        if self.Player.Length() == -1:
-                            self.Player.Load(pathname)
                         self.getMutagenTags(pathname)
                         if self.playlistBox.GetItemCount() == 1:
                             self.playlistBox.SetItemState(
