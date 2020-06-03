@@ -32,6 +32,7 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 currentpl = 'playing.db'
 ratingdb = 'rating.db'
 
+
 class Ultra(wx.Frame):
     def __init__(self, parent, id):
 
@@ -356,15 +357,16 @@ class Ultra(wx.Frame):
             self.ButtonPlay.SetValue(True)
             if artistName == '':
                 self.getNamesLastFM(path)
-            try:
 
+            try:
                 songTitle = self.song_name1
                 artistName = self.artist_name1
 
             except:
                 print("No name data from LastFM")
                 print(songTitle + artistName)
-            try:
+
+            if artistName != '':
                 self.makeCover(songTitle, artistName, path)
                 found = False
                 for recs in self.recommendations:
@@ -386,8 +388,8 @@ class Ultra(wx.Frame):
                                 songTitle, artistName)
                         except:
                             print("No recommendations for current title..")
-            except:
-                print("No data could be loaded for the song.")
+            else:
+                self.makeCover(songTitle, artistName, path)
 
         else:
             if os.name == 'nt':
@@ -492,6 +494,9 @@ class Ultra(wx.Frame):
         picNextBtn = wx.Bitmap("next-song-button.png", wx.BITMAP_TYPE_ANY)
         picNextBtn = self.scaleBitmap(picNextBtn)
 
+        picRepeatBtn = wx.Bitmap("repeat-button.png", wx.BITMAP_TYPE_ANY)
+        picRepeatBtn = self.scaleBitmap(picRepeatBtn)
+
         self.ButtonPlay = wx.BitmapToggleButton(
             self.panel, label=picPlayBtn, pos=(325, 40))
 
@@ -500,6 +505,9 @@ class Ultra(wx.Frame):
 
         self.ButtonNext = wx.BitmapButton(
             self.panel, bitmap=picNextBtn, pos=(390, 40))
+
+        self.ButtonRepeat = wx.BitmapToggleButton(
+            self.panel, label=picRepeatBtn, pos=(195, 40))
 
         self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
         self.ButtonPrev.Bind(wx.EVT_BUTTON, self.OnPrev)
@@ -702,20 +710,22 @@ class Ultra(wx.Frame):
         url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
         url += urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
-        # try:
-        link = urllib.request.urlopen(url)
-        parsed = json.load(link)
         try:
-            tags = ID3(path)
-            filename = tags.get("APIC:").data
-            image = Image.open(BytesIO(filename))
-            self.displayimage(image)
+            link = urllib.request.urlopen(url)
+            parsed = json.load(link)
+            try:
+                tags = ID3(path)
+                filename = tags.get("APIC:").data
+                image = Image.open(BytesIO(filename))
+                self.displayimage(image)
+            except:
+                imagelinks = parsed['track']['album']['image']
+                imagelink = imagelinks[3]['#text']
+                filename = urllib.request.urlopen(imagelink)
+                image = Image.open(filename)
+                self.displayimage(image)
         except:
-            imagelinks = parsed['track']['album']['image']
-            imagelink = imagelinks[3]['#text']
-            filename = urllib.request.urlopen(imagelink)
-            image = Image.open(filename)
-            self.displayimage(image)
+            print("Failed to load cover.")
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def displayimage(self, image):
@@ -808,6 +818,7 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
 
+
     def songRecommendationByTrackArtist(self, track_name, artist_name):
         artist_url = ''
         recommendations = []
@@ -883,7 +894,6 @@ class Ultra(wx.Frame):
             self.song_name1 = title
         except:
             print("No name data during search...")
-            # Check if file has ID3 tags. If not, use the LastFM API for naming.
 
 #-----------------------------------------------------------------------------------------------------------------------#
 
@@ -946,7 +956,7 @@ class Ultra(wx.Frame):
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
                     self.curs.execute(
-                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(), title.GetText()))
+                        '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(), title.GetText()))
                     self.conn.commit()
                     rows -= 1
                     row -= 1
@@ -960,7 +970,8 @@ class Ultra(wx.Frame):
                 item = self.playlistBox.GetItem(itemIdx=row, col=1)
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
-                    self.curs.execute('''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(), item.GetText()))
+                    self.curs.execute(
+                        '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(), item.GetText()))
                     self.conn.commit()
                     rows -= 1
                     row -= 1
@@ -990,13 +1001,22 @@ class Ultra(wx.Frame):
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
-        if value > self.Player.Length():
-            current = self.playlistBox.GetFocusedItem()
-            if current < self.playlistBox.GetItemCount()-1:
+        if self.ButtonRepeat.GetValue() == False:
+            if value > self.Player.Length():
+                current = self.playlistBox.GetFocusedItem()
+                if current < self.playlistBox.GetItemCount()-1:
+                    self.playlistBox.SetItemState(
+                        current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                    self.playlistBox.Select(current, on=0)
+                    self.playlistBox.Select(current+1, on=1)
+        elif self.ButtonRepeat.GetValue() is True:
+            if value > self.Player.Length():
+                current = self.playlistBox.GetFocusedItem()
                 self.playlistBox.SetItemState(
-                    current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+                    current, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
-                self.playlistBox.Select(current+1, on=1)
+                self.playlistBox.Select(current, on=1)
+
 
 
 app = wx.App()
