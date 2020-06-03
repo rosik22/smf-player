@@ -186,8 +186,7 @@ class Ultra(wx.Frame):
 
                 pathname = file.GetPath()
                 pathnames = file.GetPaths()
-                print(pathnames)
-                print(pathname)
+
             if len(pathnames) == 1:
                 try:
                     self.getMutagenTags(pathname)
@@ -359,7 +358,7 @@ class Ultra(wx.Frame):
                 artistName = self.artist_name1
 
             except:
-                print('No name data')
+                print("No name data from LastFM")
             self.makeCover(songTitle, artistName, path)
             found = False
             for recs in self.recommendations:
@@ -834,7 +833,7 @@ class Ultra(wx.Frame):
             self.artist_name1 = artist
             self.song_name1 = title
         except:
-            print("No name data...")
+            print("No name data during search...")
             # Check if file has ID3 tags. If not, use the LastFM API for naming.
 
 #-----------------------------------------------------------------------------------------------------------------------#
