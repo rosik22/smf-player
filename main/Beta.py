@@ -752,20 +752,23 @@ class Ultra(wx.Frame):
                 client_credentials_manager=SpotifyClientCredentials())
             off = 0
             found = False
-            while (found is False and off < 150):
-                # Search for album in spotify.
-                album_search = sp.search(
-                    q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
+            try:
+                while (found is False and off < 150):
+                    # Search for album in spotify.
+                    album_search = sp.search(
+                        q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
 
-                for album in album_search['albums']['items']:
-                    album_name_sp = album['name']
-                    if artist_name.lower() == str(album['artists'][0]['name']).lower():
+                    for album in album_search['albums']['items']:
+                        album_name_sp = album['name']
+                        if artist_name.lower() == str(album['artists'][0]['name']).lower():
 
-                        self.artist_url = album['artists'][0]['id']
-                        sp_artist_name = album['artists'][0]['name']
-                        found = True
-                        break
-                off += 50
+                            self.artist_url = album['artists'][0]['id']
+                            sp_artist_name = album['artists'][0]['name']
+                            found = True
+                            break
+                    off += 50
+            except:
+                print("Error during search.")
 
             artist_seed = []
             artist_seed.append(self.artist_url)
@@ -811,22 +814,27 @@ class Ultra(wx.Frame):
 
         found = False
         off = 0
-        while (found is False or off < 150):
-            track_search = sp.search(
-                q='track:'+track_name+' '+'artist:'+artist_name, limit=50, type='track', offset=off)
+        try:
+            while (found is False or off < 100):
+                track_search = sp.search(
+                    q='track:'+track_name+' '+'artist:'+artist_name, limit=50, type='track', offset=off)
 
-            for track in track_search['tracks']['items']:
-                artist_url = track['artists'][0]['id']
-                found = True
-               # print(str(artist_url))
-                break
+                for track in track_search['tracks']['items']:
+                    artist_url = track['artists'][0]['id']
+                    found = True
+                    # print(str(artist_url))
+                    break
 
-            off += 50
+                off += 50
+        except:
+            print("Error during Spotify search.")
 
         artist_seed = []
         artist_seed.append(artist_url)
-        rec = sp.recommendations(seed_artists=artist_seed, limit=20)
-
+        try:
+            rec = sp.recommendations(seed_artists=artist_seed, limit=20)
+        except:
+            print("Error during search")
         if len(rec['tracks']) == 0:
             raise Exception("No recommendations")
 
