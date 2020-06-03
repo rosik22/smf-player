@@ -92,6 +92,7 @@ class Ultra(wx.Frame):
                          self.loadSongFromRecommendationBox)
         self.recommendations = []
 
+        #
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
         self.timer.Start(100)
