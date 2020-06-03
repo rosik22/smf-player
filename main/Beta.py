@@ -72,7 +72,6 @@ class Ultra(wx.Frame):
         self.playlistBox.SetTextColour("Black")
         self.playlistBox.Bind(wx.EVT_LIST_ITEM_SELECTED,
                               self.loadSongFromListBox)
-        self.playlistBox.Bind(wx.EVT_LIST_BEGIN_DRAG, self.onDrag)
 
         self.plbox.SetBackgroundColour("White")
 
@@ -192,8 +191,6 @@ class Ultra(wx.Frame):
                 print(pathname)
             if len(pathnames) == 1:
                 try:
-                    if self.Player.Length() == -1:
-                        self.Player.Load(pathname)
                     self.getMutagenTags(pathname)
                     if self.playlistBox.GetItemCount() == 1:
                         self.playlistBox.SetItemState(
@@ -255,8 +252,6 @@ class Ultra(wx.Frame):
 
                 if len(pathnames) == 1:
                     try:
-                        if self.Player.Length() == -1:
-                            self.Player.Load(pathname)
                         self.getMutagenTags(pathname)
                         if self.playlistBox.GetItemCount() == 1:
                             self.playlistBox.SetItemState(
@@ -278,9 +273,6 @@ class Ultra(wx.Frame):
                             0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                         self.playlistBox.Select(0, on=1)
                         self.countAddToPlaylist += 1
-                        if self.Player.Length() == -1:
-                            self.Player.Load(pathname)
-                            self.countAddToPlaylist += 1
                         self.PlayerSlider.SetRange(0, self.Player.Length())
                     except IOError:
                         wx.LogError("Cannot open file '%s'." % pathname)
@@ -330,7 +322,7 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     def loadSongFromListBox(self, e):
-        row = self.playlistBox.GetFocusedItem()
+        row = e.GetEventObject().GetFocusedItem()
         self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -356,6 +348,7 @@ class Ultra(wx.Frame):
         if os.path.isfile(path):
             self.Player.Load(path)
             self.PlayerSlider.SetRange(0, self.Player.Length())
+            self.PlayerSlider.SetValue(0)
             self.Player.Play()
             self.setTimesPlayed(path, row)
             self.ButtonPlay.SetValue(True)
@@ -408,6 +401,7 @@ class Ultra(wx.Frame):
                 self.clearPanel()
                 self.curs.execute(
                     '''DELETE FROM playlist WHERE path=?''', (path,))
+                self.conn.commit()
                 evt = wx.CommandEvent(
                     wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
                 wx.PostEvent(self.ButtonNext, evt)
@@ -580,9 +574,9 @@ class Ultra(wx.Frame):
         try:
             for x in paths:
                 self.getMutagenTags(x)
-            self.playlistBox.SetItemState(
-                        0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
-            self.playlistBox.Select(0, on=1)
+         #   self.playlistBox.SetItemState(
+          #              0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+           # self.playlistBox.Select(0, on=1)
         except:
             print("Mutagen error..")
 
@@ -928,12 +922,6 @@ class Ultra(wx.Frame):
         cur = self.playlistBox.GetFocusedItem()
         item = self.playlistBox.GetItem(itemIdx=cur)
         self.playlistBox.SetItem(cur, 4, event.GetString())
-        self.curs.execute('''UPDATE playlist SET rating=? WHERE artist=?''',
-                          (event.GetString(), item.GetText()))
-        self.conn.commit()
-
-    def onDrag(self, event):
-        print("drag")
 
     def onTimer(self, event):
         value = self.Player.Tell()
