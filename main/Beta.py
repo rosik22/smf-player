@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import wx
 import wx.media
 import os
@@ -14,15 +15,14 @@ import wave
 import contextlib
 import re
 from spotipy.oauth2 import SpotifyClientCredentials
-from mutagen.id3 import ID3
-from mutagen import File as MutaFile
-from spotipy.oauth2 import SpotifyClientCredentials
 from acoustid import fingerprint_file
 from xml.dom.minidom import parseString
 from PIL import Image
 from functools import partial
 from io import BytesIO
 from shutil import copyfile
+from mutagen.id3 import ID3
+from mutagen import File as MutaFile
 
 os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
 os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
@@ -30,6 +30,8 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 
 # Currently loaded songs.
 currentpl = 'playing.db'
+
+# Rating database.
 ratingdb = 'rating.db'
 
 
@@ -41,11 +43,14 @@ class Ultra(wx.Frame):
         super().__init__(
             None, title="smf-player", style=no_resize, size=(1300, 800), pos=(0, 0))
 
-        # establish connection with the databases
+        # Establish connection with the databases
         self.establishConnectionRun()
         self.establishConnectionRating()
 
+        # Set self color.
         self.SetBackgroundColour("Black")
+
+        # Counter for listctrl when adding additional files.
         self.countListCttl = 0
         self.countAddToPlaylist = 0
 
@@ -92,19 +97,25 @@ class Ultra(wx.Frame):
                          self.loadSongFromRecommendationBox)
         self.recommendations = []
 
-        #
+        # Timer for the playback scroll.
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
         self.timer.Start(100)
 
+        # Create menu on top left of application.
         self.createMenu()
+
+        # Assign panels to sizers.
         self.createLayout()
+
+        # Create playback and functionality buttons.
         self.Buttons()
 
         self.Bind(wx.EVT_CLOSE, self.OnClose)
         self.Center()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Steps to do after closing window. Like disconnecting from db.
     def OnClose(self, e):
         self.conn.close()
         self.Player.SetVolume(1.0)
@@ -115,26 +126,38 @@ class Ultra(wx.Frame):
     def createMenu(self):
         menubar = wx.MenuBar()
         filemenu = wx.Menu()
+        helpmenu = wx.Menu()
+
+        # Appending options in file menu.
         open1 = filemenu.Append(-1, '&Open')
         openf = filemenu.Append(-1, '&Open folder')
         add = filemenu.Append(-1, '&Add to playlist')
         openpl = filemenu.Append(-1, '&Open Playlist')
         savepl = filemenu.Append(-1, '&Save Playlist')
         exit2 = filemenu.Append(-1, '&Exit')
+
+        # Appending "about" info in help menu.
+        about = helpmenu.Append(-1, "&About")
+
         menubar.Append(filemenu, '&File')
+        menubar.Append(helpmenu, "&Help")
         self.SetMenuBar(menubar)
+
+        # Using partial to recognize which option has been chosen.
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 1), openf)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 2), open1)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 3), add)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 4), exit2)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 5), savepl)
         self.Bind(wx.EVT_MENU, partial(self.menuhandler, 6), openpl)
+        self.Bind(wx.EVT_MENU, partial(self.menuhandler, 7), about)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Function to handle menubar options.
     def menuhandler(self, num, event):
         id = event.GetId()
-        # Load folder.
+
+        # Open folder.
         if num == 1:
             with wx.DirDialog(self.panel, "Open Music Dir", style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST) as directory:
 
@@ -144,6 +167,7 @@ class Ultra(wx.Frame):
                 pathname = directory.GetPath()
                 self.countListCttl = 0
 
+                # Load data on blank space.
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
@@ -151,6 +175,8 @@ class Ultra(wx.Frame):
                     self.playlistBox.DeleteAllItems()
                     self.clearPanel()
                     self.clearRecommendationBox()
+
+                    # Search for all files in given path and load them with GetMutagenTags.
                     self.loadFolder(pathname)
                 except:
                     print("Error during loading the path and/or files within...")
@@ -166,6 +192,7 @@ class Ultra(wx.Frame):
                 pathname = file.GetPath()
                 self.countListCttl = 0
 
+                # Clear all boxes and load current file by pathname.
                 try:
                     self.curs.execute('DELETE FROM playlist;')
                     self.conn.commit()
@@ -191,6 +218,7 @@ class Ultra(wx.Frame):
                 pathname = file.GetPath()
                 pathnames = file.GetPaths()
 
+        # Open just a single file path.
             if len(pathnames) == 1:
                 try:
                     self.getMutagenTags(pathname)
@@ -205,6 +233,8 @@ class Ultra(wx.Frame):
                     self.PlayerSlider.SetRange(0, self.Player.Length())
                 except IOError:
                     wx.LogError("Cannot open file '%s'." % pathname)
+
+        # Open multiple file paths.
             elif len(pathnames) > 1:
                 try:
                     if self.playlistBox.GetItemCount() == 0:
@@ -226,6 +256,7 @@ class Ultra(wx.Frame):
         elif num == 4:
             self.Close()
 
+        # Save playlist to another *.db file for later use.
         elif num == 5:
             with wx.FileDialog(self.panel, "Save playlist", wildcard="Playlist file (*.db)|*.db", style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file:
 
@@ -240,17 +271,21 @@ class Ultra(wx.Frame):
                         savedfile += '.db'
                     currfile = copyfile('playing.db', savedfile)
 
+        # Open a playlist *.db file
         elif num == 6:
             with wx.FileDialog(self.panel, "Open playlist file", wildcard="Playlist files (*.db)|*.db", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as file:
 
                 if file.ShowModal() == wx.ID_CANCEL:
                     return
 
+                # Get path of *.db file
                 pathname = file.GetPath()
                 self.playlistBox.DeleteAllItems()
                 self.clearRecommendationBox()
                 self.countListCttl = 0
                 self.countAddToPlaylist = 0
+
+                # Connect to playlist file and load all paths.
                 self.establishConnectionPl(pathname)
                 pathnames = self.loadPlaylist()
 
@@ -281,9 +316,16 @@ class Ultra(wx.Frame):
                     except IOError:
                         wx.LogError("Cannot open file '%s'." % pathname)
 
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Sets the layout
+        # Show about info.
+        elif num == 7:
 
+            info = wx.MessageDialog(
+                self.panel, "Smf-Player is free for use and covered by the GNU v3.0 license.", "Smf-Player ver 0.01", wx.OK | wx.CENTER,)
+            info.ShowModal()
+
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Sets the layout for the player.
     def createLayout(self):
         try:
             self.Player = wx.media.MediaCtrl(self, style=wx.SIMPLE_BORDER)
@@ -325,40 +367,52 @@ class Ultra(wx.Frame):
         self.SetSizer(sizer)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Get playlist box rows and pass to load.
     def loadSongFromListBox(self, e):
         row = e.GetEventObject().GetFocusedItem()
         self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Load song and pass more data to load and or store.
     def loadSong(self, row):
         self.clearRecommendationBox()
         d = []
+        # Find which row is clicked in ListCtrl.
         cols = self.playlistBox.GetColumnCount()
         for col in range(cols-1):
             item = self.playlistBox.GetItem(itemIdx=row, col=col)
             d.append(item.GetText())
 
+        # Assign artistName and SongTitle from ListCtrl.
         artistName = str(d[0])
         songTitle = str(d[1])
 
+        # Find path of selected song.
         self.curs.execute(
             '''SELECT path FROM playlist WHERE artist=? AND title=?''', (artistName, songTitle))
         path = ''.join(self.curs.fetchone())
 
+        # Get the amount of times the file has been played.
         self.curs.execute(
             '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
         timesplayed = int(self.curs.fetchone()[0])
 
+        # Check if the path leads to a file.
         if os.path.isfile(path):
+
+            # Load song onto player.
             self.Player.Load(path)
             self.PlayerSlider.SetRange(0, self.Player.Length())
             self.PlayerSlider.SetValue(0)
             self.Player.Play()
             self.setTimesPlayed(path, row)
             self.ButtonPlay.SetValue(True)
+
+            # If the artist name is empty, try finding the name via AcoustID/LastFM combo.
             if artistName == '':
                 self.getNamesLastFM(path)
 
+            # Try to assign names from above function but handle exception if above function does not return any data.
             try:
                 songTitle = self.song_name1
                 artistName = self.artist_name1
@@ -367,8 +421,11 @@ class Ultra(wx.Frame):
                 print("No name data from LastFM")
                 print(songTitle + artistName)
 
+            #If artist name is not empty then load a cover image and check for recommendations from Spotify.
             if artistName != '':
                 self.makeCover(songTitle, artistName, path)
+
+                # Check if song has already received recommendations and load them instead of searching again.
                 found = False
                 for recs in self.recommendations:
                     for x in recs:
@@ -389,9 +446,11 @@ class Ultra(wx.Frame):
                                 songTitle, artistName)
                         except:
                             print("No recommendations for current title..")
+            # If the artist name is empty then skip the above and try loading only a cover image.
             else:
                 self.makeCover(songTitle, artistName, path)
 
+        # Search for file in paths below current if it has been moved.
         else:
             if os.name == 'nt':
                 p = path.rsplit('\\', 1)
@@ -416,6 +475,7 @@ class Ultra(wx.Frame):
                 evt = wx.CommandEvent(
                     wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
                 wx.PostEvent(self.ButtonNext, evt)
+            # If the file is found, then update the location in the database.
             else:
                 self.curs.execute(
                     '''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
@@ -423,6 +483,7 @@ class Ultra(wx.Frame):
                 self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Loads data from playlist whilst formatting the query to a standart list instead of a tuple.
     def loadPlaylist(self):
         self.curs1.row_factory = lambda cursor, row: row[0]
         self.curs1.execute('''SELECT path FROM playlist''')
@@ -430,6 +491,7 @@ class Ultra(wx.Frame):
         return data
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Clears playback, cover art panel and sets button to stopped.
     def clearPanel(self):
         self.Player.Stop()
         self.PlayerSlider.SetValue(0)
@@ -437,9 +499,10 @@ class Ultra(wx.Frame):
         self.ButtonPlay.SetValue(False)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-
+    # Loads song that has been selected from the recommendation box.
     def loadSongFromRecommendationBox(self, e):
         d = []
+        # Get selected row.
         row = e.GetEventObject().GetFocusedItem()
         count = self.recBox.GetItemCount()
         cols = self.recBox.GetColumnCount()
@@ -447,8 +510,11 @@ class Ultra(wx.Frame):
             item = self.recBox.GetItem(itemIdx=row, col=col)
             d.append(item.GetText())
 
+        # Get names once again.
         artistName = str(d[0])
         songTitle = str(d[1])
+
+        # If names match ones available in recommendation list of lists, then start song.
         for s in self.recommendations:
             for song in s:
                 if song[0] == artistName and song[1] == songTitle:
@@ -1017,7 +1083,6 @@ class Ultra(wx.Frame):
                     current, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
                 self.playlistBox.Select(current, on=1)
-
 
 
 app = wx.App()
