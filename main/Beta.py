@@ -525,17 +525,21 @@ class Ultra(wx.Frame):
                     break
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Sets the counter for each song based on the times they played the song
     def setTimesPlayed(self, path, row):
+        # Finds the current value of the counter in the database
         self.curs.execute(
             '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
         t = int(self.curs.fetchone()[0])
         t += 1
+        # Inputs the new incremented value of the counter
         self.curs.execute(
             '''UPDATE playlist SET timesplayed=? WHERE path=?''', (t, path))
         self.conn.commit()
         self.playlistBox.SetItem(row, 3, str(t))
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Scales the bitmap of the the buttons to a specific scale
     def scaleBitmap(self, bitmap):
         image = bitmap.ConvertToImage()
         image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
@@ -543,6 +547,7 @@ class Ultra(wx.Frame):
         return result
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Creates the buttons and their bindings
     def Buttons(self):
         self.FilterBtn = wx.Button(
             self.plbox, label="Filter", size=(100, 30), pos=(475, 453))
@@ -584,24 +589,27 @@ class Ultra(wx.Frame):
         self.RatingBtns.Bind(wx.EVT_RADIOBOX, self.onRate)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Operates with ID3 tags
     def getMutagenTags(self, path):
         data = []
+        # Creates the MutaFile
         try:
             song = MutaFile(path)
             self.d = int(song.info.length)
         except:
+            # Calculates the song lenght if the song is in .wave format
             with contextlib.closing(wave.open(path, 'r')) as file:
                 frames = file.getnframes()
                 rate = file.getframerate()
                 self.d = frames / float(rate)
         title = 'n/a'
         artist = ''
+        # Backup in case there are no ID3 tags and the API can't find new ones
         backup_name = os.path.split(path)
         backup_name = backup_name[-1]
         backup_name = backup_name.split('.')
         backup_name = str(backup_name[0])
 
-        # print(backup_name)
         title = backup_name
 
         try:
@@ -630,6 +638,7 @@ class Ultra(wx.Frame):
         data.append(path)
 
         check = False
+        # If the song is already in the list it is not inserted again
         if self.playlistBox.GetItemCount() > 0:
             count = self.playlistBox.GetItemCount()
             cols = self.playlistBox.GetColumnCount()
@@ -648,6 +657,7 @@ class Ultra(wx.Frame):
             self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Loads all files from the selected folder
     def loadFolder(self, path):
         paths = []
         for root, dirs, files in os.walk(path):
@@ -665,6 +675,7 @@ class Ultra(wx.Frame):
             print("Mutagen error..")
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Loads playlists
     def loadFiles(self, paths):
         try:
             for file in paths:
@@ -673,7 +684,9 @@ class Ultra(wx.Frame):
             print("Could not load multiple files..")
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Fills the songs' data in the list
     def fillPlaylistBox(self, data):
+        # Searches the database for rating if it exists
         list1 = (data[2], data[0], data[1])
         self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
             list1[0]), str(list1[1])))
@@ -690,6 +703,7 @@ class Ultra(wx.Frame):
         self.countListCttl += 1
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Fills the recomendation box with the currently recomended songs
     def fillRecommendationBox(self, data, artist_name):
         dur = '0:30'
         for x in data:
@@ -700,10 +714,12 @@ class Ultra(wx.Frame):
                 self.recBox.SetItem(0, 2, str(list1[2]))
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Clear the recomendation box from its data
     def clearRecommendationBox(self):
         self.recBox.DeleteAllItems()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with currentpl
     def establishConnectionRun(self):
         self.conn = None
         try:
@@ -716,6 +732,7 @@ class Ultra(wx.Frame):
         self.createTableRunning()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with ratingdb
     def establishConnectionRating(self):
         self.conn2 = None
         try:
@@ -728,6 +745,7 @@ class Ultra(wx.Frame):
         self.createTableRating()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # create the table of ratingdb
     def createTableRating(self):
         self.curs2.execute('''CREATE TABLE IF NOT EXISTS rate
                             (title VARCHAR(255) UNIQUE,
@@ -736,12 +754,14 @@ class Ultra(wx.Frame):
         self.conn2.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Insert data into ratingdb
     def playlistrate(self, data):
         self.curs2.execute('''REPLACE INTO rate(title, artist, rating)
                     VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0], data[2], data[0], data[2]))
         self.conn2.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with saved playlist's database
     def establishConnectionPl(self, path):
         self.conn1 = None
         try:
