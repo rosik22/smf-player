@@ -1,5 +1,5 @@
 # smf-player
-#**This is a simple music file player for a project. The code will be primarily in python.**
+# **This is a simple music file player for a project. The code will be primarily in python.**
 
 **The project is a joint effort between me and rosik22 for a University project.**
 
