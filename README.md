@@ -6,3 +6,5 @@ ID3 tag reading is part of its forte along with loading album art covers whereve
 song recommendations via Spotify's Web API.
 
 More can be said but it's best to try it out. The GUI is written in wxPython.
+
+![Image of Yaktocat](https://github.com/roterabe/smf-player/blob/master/101708773_946001632486888_4817479256156143616_n.png)
