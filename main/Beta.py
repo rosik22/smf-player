@@ -326,6 +326,8 @@ class Ultra(wx.Frame):
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Sets the layout for the player.
+
+
     def createLayout(self):
         try:
             self.Player = wx.media.MediaCtrl(self, style=wx.SIMPLE_BORDER)
@@ -365,6 +367,64 @@ class Ultra(wx.Frame):
         sizer.Add(s1)
         sizer.Add(s2)
         self.SetSizer(sizer)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Creates the buttons and their bindings
+    def Buttons(self):
+        self.FilterBtn = wx.Button(
+            self.plbox, label="Filter", size=(100, 30), pos=(475, 453))
+
+        choices = ['1', '2', '3', '4', '5']
+        self.RatingBtns = wx.RadioBox(self.plbox, -1, "Rating", pos=(25, 440),
+                                      size=(180, 45), choices=choices, style=wx.RA_HORIZONTAL)
+        self.RatingBtns.SetForegroundColour((40, 40, 40))
+
+        picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
+        picPlayBtn = self.scaleBitmap(picPlayBtn)
+
+        picPrevBtn = wx.Bitmap("previous-song-button.png", wx.BITMAP_TYPE_ANY)
+        picPrevBtn = self.scaleBitmap(picPrevBtn)
+
+        picNextBtn = wx.Bitmap("next-song-button.png", wx.BITMAP_TYPE_ANY)
+        picNextBtn = self.scaleBitmap(picNextBtn)
+
+        picRepeatBtn = wx.Bitmap("repeat-button.png", wx.BITMAP_TYPE_ANY)
+        picRepeatBtn = self.scaleBitmap(picRepeatBtn)
+
+        self.ButtonPlay = wx.BitmapToggleButton(
+            self.panel, label=picPlayBtn, pos=(325, 40))
+
+        self.ButtonPrev = wx.BitmapButton(
+            self.panel, bitmap=picPrevBtn, pos=(260, 40))
+
+        self.ButtonNext = wx.BitmapButton(
+            self.panel, bitmap=picNextBtn, pos=(390, 40))
+
+        self.ButtonRepeat = wx.BitmapToggleButton(
+            self.panel, label=picRepeatBtn, pos=(195, 40))
+
+        self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
+        self.ButtonPrev.Bind(wx.EVT_BUTTON, self.OnPrev)
+        self.ButtonNext.Bind(wx.EVT_BUTTON, self.OnNext)
+
+        self.FilterBtn.Bind(wx.EVT_BUTTON, self.onFilter)
+        self.RatingBtns.Bind(wx.EVT_RADIOBOX, self.onRate)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Scales the bitmap of the the buttons to a specific scale
+    def scaleBitmap(self, bitmap):
+        image = bitmap.ConvertToImage()
+        image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
+        result = wx.Bitmap(image)
+        return result
+        
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Clears playback, cover art panel and sets button to stopped.
+    def clearPanel(self):
+        self.Player.Stop()
+        self.PlayerSlider.SetValue(0)
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
+        self.ButtonPlay.SetValue(False)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Get playlist box rows and pass to load.
@@ -421,7 +481,7 @@ class Ultra(wx.Frame):
                 print("No name data from LastFM")
                 print(songTitle + artistName)
 
-            #If artist name is not empty then load a cover image and check for recommendations from Spotify.
+            # If artist name is not empty then load a cover image and check for recommendations from Spotify.
             if artistName != '':
                 self.makeCover(songTitle, artistName, path)
 
@@ -483,20 +543,18 @@ class Ultra(wx.Frame):
                 self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Loads data from playlist whilst formatting the query to a standart list instead of a tuple.
-    def loadPlaylist(self):
-        self.curs1.row_factory = lambda cursor, row: row[0]
-        self.curs1.execute('''SELECT path FROM playlist''')
-        data = self.curs1.fetchall()
-        return data
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Clears playback, cover art panel and sets button to stopped.
-    def clearPanel(self):
-        self.Player.Stop()
-        self.PlayerSlider.SetValue(0)
-        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
-        self.ButtonPlay.SetValue(False)
+    # Sets the counter for each song based on the times they played the song
+    def setTimesPlayed(self, path, row):
+        # Finds the current value of the counter in the database
+        self.curs.execute(
+            '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
+        t = int(self.curs.fetchone()[0])
+        t += 1
+        # Inputs the new incremented value of the counter
+        self.curs.execute(
+            '''UPDATE playlist SET timesplayed=? WHERE path=?''', (t, path))
+        self.conn.commit()
+        self.playlistBox.SetItem(row, 3, str(t))
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Loads song that has been selected from the recommendation box.
@@ -525,68 +583,148 @@ class Ultra(wx.Frame):
                     break
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Sets the counter for each song based on the times they played the song
-    def setTimesPlayed(self, path, row):
-        # Finds the current value of the counter in the database
-        self.curs.execute(
-            '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
-        t = int(self.curs.fetchone()[0])
-        t += 1
-        # Inputs the new incremented value of the counter
-        self.curs.execute(
-            '''UPDATE playlist SET timesplayed=? WHERE path=?''', (t, path))
+    # Loads all files from the selected folder
+    def loadFolder(self, path):
+        paths = []
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.lower().endswith(('.mp3', '.flac', '.wav', '.aac', 'ogg')):
+                    paths.append(os.path.join(root, file))
+
+        try:
+            for x in paths:
+                self.getMutagenTags(x)
+            self.playlistBox.SetItemState(
+                0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+            self.playlistBox.Select(0, on=1)
+        except:
+            print("Mutagen error..")
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Loads playlists
+    def loadFiles(self, paths):
+        try:
+            for file in paths:
+                self.getMutagenTags(file)
+        except:
+            print("Could not load multiple files..")
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Loads data from playlist whilst formatting the query to a standart list instead of a tuple.
+    def loadPlaylist(self):
+        self.curs1.row_factory = lambda cursor, row: row[0]
+        self.curs1.execute('''SELECT path FROM playlist''')
+        data = self.curs1.fetchall()
+        return data
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Fills the songs' data in the list
+    def fillPlaylistBox(self, data):
+        # Searches the database for rating if it exists
+        list1 = (data[2], data[0], data[1])
+        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
+            list1[0]), str(list1[1])))
+        rate = str(self.curs2.fetchone()[0])
+
+        self.playlistBox.InsertItem(self.countListCttl, list1[0])
+        self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
+        self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
+        self.playlistBox.SetItem(self.countListCttl, 3, str(0))
+        if rate == "None":
+            self.playlistBox.SetItem(self.countListCttl, 4, str(0))
+        else:
+            self.playlistBox.SetItem(self.countListCttl, 4, str(rate))
+        self.countListCttl += 1
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Fills the recomendation box with the currently recomended songs
+    def fillRecommendationBox(self, data, artist_name):
+        dur = '0:30'
+        for x in data:
+            if artist_name in x:
+                list1 = (x[0], x[1], dur)
+                self.recBox.InsertItem(0, str(list1[0]))
+                self.recBox.SetItem(0, 1, str(list1[1]))
+                self.recBox.SetItem(0, 2, str(list1[2]))
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Clear the recomendation box from its data
+    def clearRecommendationBox(self):
+        self.recBox.DeleteAllItems()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Create table for the currently running playlist.
+    def createTableRunning(self):
+        self.curs.execute('''CREATE TABLE IF NOT EXISTS playlist
+                            (title VARCHAR(255) UNIQUE,
+                            duration VARCHAR(255),
+                            artist VARCHAR(255),
+                            year VARCHAR(255),
+                            path VARCHAR(255),
+                            timesplayed VARCHAR(255))''')
+        self.curs.execute('DELETE FROM playlist;')
         self.conn.commit()
-        self.playlistBox.SetItem(row, 3, str(t))
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Scales the bitmap of the the buttons to a specific scale
-    def scaleBitmap(self, bitmap):
-        image = bitmap.ConvertToImage()
-        image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
-        result = wx.Bitmap(image)
-        return result
+    # Establish connection with currentpl
+    def establishConnectionRun(self):
+        self.conn = None
+        try:
+            self.conn = sqlite3.connect(currentpl)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
+
+        self.curs = self.conn.cursor()
+        self.createTableRunning()
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Creates the buttons and their bindings
-    def Buttons(self):
-        self.FilterBtn = wx.Button(
-            self.plbox, label="Filter", size=(100, 30), pos=(475, 453))
+    # create the table of ratingdb
+    def createTableRating(self):
+        self.curs2.execute('''CREATE TABLE IF NOT EXISTS rate
+                            (title VARCHAR(255) UNIQUE,
+                            artist VARCHAR(255),
+                            rating VARCHAR(255))''')
+        self.conn2.commit()
 
-        choices = ['1', '2', '3', '4', '5']
-        self.RatingBtns = wx.RadioBox(self.plbox, -1, "Rating", pos=(25, 440),
-                                      size=(180, 45), choices=choices, style=wx.RA_HORIZONTAL)
-        self.RatingBtns.SetForegroundColour((40, 40, 40))
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with ratingdb
+    def establishConnectionRating(self):
+        self.conn2 = None
+        try:
+            self.conn2 = sqlite3.connect(ratingdb)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
 
-        picPlayBtn = wx.Bitmap("play-button.png", wx.BITMAP_TYPE_ANY)
-        picPlayBtn = self.scaleBitmap(picPlayBtn)
+        self.curs2 = self.conn2.cursor()
+        self.createTableRating()
 
-        picPrevBtn = wx.Bitmap("previous-song-button.png", wx.BITMAP_TYPE_ANY)
-        picPrevBtn = self.scaleBitmap(picPrevBtn)
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with saved playlist's database
+    def establishConnectionPl(self, path):
+        self.conn1 = None
+        try:
+            self.conn1 = sqlite3.connect(path)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
 
-        picNextBtn = wx.Bitmap("next-song-button.png", wx.BITMAP_TYPE_ANY)
-        picNextBtn = self.scaleBitmap(picNextBtn)
+        self.curs1 = self.conn1.cursor()
 
-        picRepeatBtn = wx.Bitmap("repeat-button.png", wx.BITMAP_TYPE_ANY)
-        picRepeatBtn = self.scaleBitmap(picRepeatBtn)
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Insert data into ratingdb
+    def playlistrate(self, data):
+        self.curs2.execute('''REPLACE INTO rate(title, artist, rating)
+                    VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0], data[2], data[0], data[2]))
+        self.conn2.commit()
 
-        self.ButtonPlay = wx.BitmapToggleButton(
-            self.panel, label=picPlayBtn, pos=(325, 40))
-
-        self.ButtonPrev = wx.BitmapButton(
-            self.panel, bitmap=picPrevBtn, pos=(260, 40))
-
-        self.ButtonNext = wx.BitmapButton(
-            self.panel, bitmap=picNextBtn, pos=(390, 40))
-
-        self.ButtonRepeat = wx.BitmapToggleButton(
-            self.panel, label=picRepeatBtn, pos=(195, 40))
-
-        self.ButtonPlay.Bind(wx.EVT_TOGGLEBUTTON, self.OnPlay)
-        self.ButtonPrev.Bind(wx.EVT_BUTTON, self.OnPrev)
-        self.ButtonNext.Bind(wx.EVT_BUTTON, self.OnNext)
-
-        self.FilterBtn.Bind(wx.EVT_BUTTON, self.onFilter)
-        self.RatingBtns.Bind(wx.EVT_RADIOBOX, self.onRate)
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Add new songs to database.
+    def playlistd(self, data):
+        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed)
+                    VALUES(?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0))
+        self.conn.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Operates with ID3 tags
@@ -657,301 +795,9 @@ class Ultra(wx.Frame):
             self.fillPlaylistBox(data)
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Loads all files from the selected folder
-    def loadFolder(self, path):
-        paths = []
-        for root, dirs, files in os.walk(path):
-            for file in files:
-                if file.lower().endswith(('.mp3', '.flac', '.wav', '.aac', 'ogg')):
-                    paths.append(os.path.join(root, file))
-
-        try:
-            for x in paths:
-                self.getMutagenTags(x)
-            self.playlistBox.SetItemState(
-                0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
-            self.playlistBox.Select(0, on=1)
-        except:
-            print("Mutagen error..")
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Loads playlists
-    def loadFiles(self, paths):
-        try:
-            for file in paths:
-                self.getMutagenTags(file)
-        except:
-            print("Could not load multiple files..")
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Fills the songs' data in the list
-    def fillPlaylistBox(self, data):
-        # Searches the database for rating if it exists
-        list1 = (data[2], data[0], data[1])
-        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
-            list1[0]), str(list1[1])))
-        rate = str(self.curs2.fetchone()[0])
-
-        self.playlistBox.InsertItem(self.countListCttl, list1[0])
-        self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
-        self.playlistBox.SetItem(self.countListCttl, 2, str(list1[2]))
-        self.playlistBox.SetItem(self.countListCttl, 3, str(0))
-        if rate == "None":
-            self.playlistBox.SetItem(self.countListCttl, 4, str(0))
-        else:
-            self.playlistBox.SetItem(self.countListCttl, 4, str(rate))
-        self.countListCttl += 1
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Fills the recomendation box with the currently recomended songs
-    def fillRecommendationBox(self, data, artist_name):
-        dur = '0:30'
-        for x in data:
-            if artist_name in x:
-                list1 = (x[0], x[1], dur)
-                self.recBox.InsertItem(0, str(list1[0]))
-                self.recBox.SetItem(0, 1, str(list1[1]))
-                self.recBox.SetItem(0, 2, str(list1[2]))
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Clear the recomendation box from its data
-    def clearRecommendationBox(self):
-        self.recBox.DeleteAllItems()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with currentpl
-    def establishConnectionRun(self):
-        self.conn = None
-        try:
-            self.conn = sqlite3.connect(currentpl)
-        except sqlite3.Error as e:
-            print(e)
-            print("Unable to establish connection to database...\n")
-
-        self.curs = self.conn.cursor()
-        self.createTableRunning()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with ratingdb
-    def establishConnectionRating(self):
-        self.conn2 = None
-        try:
-            self.conn2 = sqlite3.connect(ratingdb)
-        except sqlite3.Error as e:
-            print(e)
-            print("Unable to establish connection to database...\n")
-
-        self.curs2 = self.conn2.cursor()
-        self.createTableRating()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # create the table of ratingdb
-    def createTableRating(self):
-        self.curs2.execute('''CREATE TABLE IF NOT EXISTS rate
-                            (title VARCHAR(255) UNIQUE,
-                            artist VARCHAR(255),
-                            rating VARCHAR(255))''')
-        self.conn2.commit()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Insert data into ratingdb
-    def playlistrate(self, data):
-        self.curs2.execute('''REPLACE INTO rate(title, artist, rating)
-                    VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0], data[2], data[0], data[2]))
-        self.conn2.commit()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with saved playlist's database
-    def establishConnectionPl(self, path):
-        self.conn1 = None
-        try:
-            self.conn1 = sqlite3.connect(path)
-        except sqlite3.Error as e:
-            print(e)
-            print("Unable to establish connection to database...\n")
-
-        self.curs1 = self.conn1.cursor()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def createTableRunning(self):
-        self.curs.execute('''CREATE TABLE IF NOT EXISTS playlist
-                            (title VARCHAR(255) UNIQUE,
-                            duration VARCHAR(255),
-                            artist VARCHAR(255),
-                            year VARCHAR(255),
-                            path VARCHAR(255),
-                            timesplayed VARCHAR(255),
-                            rating VARCHAR(255))''')
-        self.curs.execute('DELETE FROM playlist;')
-        self.conn.commit()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def playlistd(self, data):
-        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed,rating)
-                    VALUES(?,?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0, 0))
-        self.conn.commit()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def makeCover(self, track_name, artist_name, path):
-        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
-        url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
-        url += urllib.parse.quote(artist_name) + \
-            '&track=' + urllib.parse.quote(track_name)
-        try:
-            link = urllib.request.urlopen(url)
-            parsed = json.load(link)
-            try:
-                tags = ID3(path)
-                filename = tags.get("APIC:").data
-                image = Image.open(BytesIO(filename))
-                self.displayimage(image)
-            except:
-                imagelinks = parsed['track']['album']['image']
-                imagelink = imagelinks[3]['#text']
-                filename = urllib.request.urlopen(imagelink)
-                image = Image.open(filename)
-                self.displayimage(image)
-        except:
-            print("Failed to load cover.")
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def displayimage(self, image):
-        self.width, self.height = image.size
-        image.thumbnail((500, 500))
-        self.PilImageToWxImage(image)
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def PilImageToWxImage(self, img):
-
-        myWxImage = wx.Image(img.size[0], img.size[1])
-
-        dataRGB = img.convert(
-            'RGB').tobytes()
-        myWxImage.SetData(dataRGB)
-        if myWxImage.HasAlpha():
-            dataRGBA = img.tobytes()[3::4]
-            myWxImage.SetAlphaData(dataRGBA)
-        self.disp.SetBitmap(wx.Bitmap(myWxImage))
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    def getSongRecommendationByAlbumArtist(self, track_name, artist_name):
-        try:
-            print(artist_name + ' -- ' + track_name)
-            # Get album name for reference from LastFM API.
-            album_name = ''
-            uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
-            uurl += urllib.parse.quote(artist_name) + \
-                '&track=' + urllib.parse.quote(track_name)
-
-            uurlink = urllib.request.urlopen(uurl)
-            pparsed = json.load(uurlink)
-            album_name = pparsed['track']['album']['title']
-
-            recommendations = []
-            sp = spotipy.Spotify(
-                client_credentials_manager=SpotifyClientCredentials())
-            off = 0
-            found = False
-            try:
-                while (found is False and off < 150):
-                    # Search for album in spotify.
-                    album_search = sp.search(
-                        q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
-
-                    for album in album_search['albums']['items']:
-                        album_name_sp = album['name']
-                        if artist_name.lower() == str(album['artists'][0]['name']).lower():
-
-                            self.artist_url = album['artists'][0]['id']
-                            sp_artist_name = album['artists'][0]['name']
-                            found = True
-                            break
-                    off += 50
-            except:
-                print("Error during search.")
-
-            artist_seed = []
-            artist_seed.append(self.artist_url)
-            rec = sp.recommendations(seed_artists=artist_seed, limit=20)
-
-            if len(rec['tracks']) == 0:
-                raise Exception
-
-            for track in rec['tracks']:
-                if track['preview_url'] is not None:
-
-                    preview_url = track['preview_url']
-                    title = track['name']
-                    # print(str(track['preview_url']) + ' -- ' + track['name'])
-                    art_name = track['album']['artists'][0]['name']
-                    data = [art_name, title, preview_url, artist_name]
-                    recommendations.append(data)
-            self.recommendations.append(recommendations)
-            self.fillRecommendationBox(recommendations, artist_name)
-
-        except:
-            print("Trying LastFM only as reference.")
-            url = 'http://ws.audioscrobbler.com/2.0/?method=track.getsimilar&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
-            url += urllib.parse.quote(artist_name) + \
-                '&track=' + urllib.parse.quote(track_name)
-
-            link = urllib.request.urlopen(url)
-            parsed = json.load(link)
-            if len(parsed['similartrack']['tracks']) == 0:
-                raise Exception("Loading next recommendation method...")
-            for track in parsed['similartracks']['track']:
-                print(track['name'])
-
-
-#-----------------------------------------------------------------------------------------------------------------------#
-
-
-    def songRecommendationByTrackArtist(self, track_name, artist_name):
-        artist_url = ''
-        recommendations = []
-        sp = spotipy.Spotify(
-            client_credentials_manager=SpotifyClientCredentials())
-
-        found = False
-        off = 0
-        try:
-            while (found is False or off < 100):
-                track_search = sp.search(
-                    q='track:'+track_name+' '+'artist:'+artist_name, limit=50, type='track', offset=off)
-
-                for track in track_search['tracks']['items']:
-                    artist_url = track['artists'][0]['id']
-                    found = True
-                    # print(str(artist_url))
-                    break
-
-                off += 50
-        except:
-            print("Error during Spotify search.")
-
-        artist_seed = []
-        artist_seed.append(artist_url)
-        try:
-            rec = sp.recommendations(seed_artists=artist_seed, limit=20)
-        except:
-            print("Error during search")
-        if len(rec['tracks']) == 0:
-            raise Exception("No recommendations")
-
-        for track in rec['tracks']:
-            if track['preview_url'] is not None:
-
-                preview_url = track['preview_url']
-                title = track['name']
-                art_name = track['album']['artists'][0]['name']
-                data = [art_name, title, preview_url, artist_name]
-                recommendations.append(data)
-
-        self.recommendations.append(recommendations)
-        self.fillRecommendationBox(recommendations, artist_name)
-
-#-----------------------------------------------------------------------------------------------------------------------#
+    # Get Song name and Artist name if not available in ID3.
     def getNamesLastFM(self, path):
+
         # Use acoustid API to get song data if ID3 tags are not available.
         fing = fingerprint_file(path, force_fpcalc=True)
         fing = fing[1]
@@ -970,6 +816,7 @@ class Ultra(wx.Frame):
                     names = x
                     title = names[-2]
                     artist = names[-1]
+                    # Check if any feat. artists names in original name.
                     if ';' in artist:
                         artist = artist.split(';')
                         artist = artist[0]
@@ -983,7 +830,170 @@ class Ultra(wx.Frame):
             print("No name data during search...")
 
 #-----------------------------------------------------------------------------------------------------------------------#
+    # LastFM API call to get album cover.
+    def makeCover(self, track_name, artist_name, path):
+        # Set a blank bitmap on the static bitmap.
+        self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
+        url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
+        url += urllib.parse.quote(artist_name) + \
+            '&track=' + urllib.parse.quote(track_name)
+        try:
+            link = urllib.request.urlopen(url)
+            parsed = json.load(link)
+            try:
+                # First try loading an image from ID3
+                tags = ID3(path)
+                filename = tags.get("APIC:").data
+                # Convert Bytes data to PIL image.
+                image = Image.open(BytesIO(filename))
+                self.displayimage(image)
+            except:
+                imagelinks = parsed['track']['album']['image']
+                imagelink = imagelinks[3]['#text']
+                filename = urllib.request.urlopen(imagelink)
+                image = Image.open(filename)
+                self.displayimage(image)
+        except:
+            print("Failed to load cover.")
 
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Load conver PIL image to wx.Image file and load it to a static bitmap.
+    def displayimage(self, image):
+        self.width, self.height = image.size
+        image.thumbnail((500, 500))
+        self.PilImageToWxImage(image)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Conver PIL image to wx.Image whilst checking if the image has alpha and load it to a static Bitmap.
+    def PilImageToWxImage(self, img):
+
+        myWxImage = wx.Image(img.size[0], img.size[1])
+
+        dataRGB = img.convert(
+            'RGB').tobytes()
+        myWxImage.SetData(dataRGB)
+        if myWxImage.HasAlpha():
+            dataRGBA = img.tobytes()[3::4]
+            myWxImage.SetAlphaData(dataRGBA)
+        self.disp.SetBitmap(wx.Bitmap(myWxImage))
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # API call to get song recommendations by Album name and Artist name.
+    def getSongRecommendationByAlbumArtist(self, track_name, artist_name):
+        # Use LastFM to get the album name.
+        print(artist_name + ' -- ' + track_name)
+        # Get album name for reference from LastFM API.
+        album_name = ''
+        uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
+        uurl += urllib.parse.quote(artist_name) + \
+            '&track=' + urllib.parse.quote(track_name)
+
+        uurlink = urllib.request.urlopen(uurl)
+        pparsed = json.load(uurlink)
+        album_name = pparsed['track']['album']['title']
+
+        recommendations = []
+        sp = spotipy.Spotify(
+            client_credentials_manager=SpotifyClientCredentials())
+        off = 0
+        found = False
+        # Recursively call on spotify API to find artist url.
+        try:
+            while (found is False and off < 150):
+                # Search for album in spotify.
+                album_search = sp.search(
+                    q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
+
+                for album in album_search['albums']['items']:
+                    album_name_sp = album['name']
+                    if artist_name.lower() == str(album['artists'][0]['name']).lower():
+
+                        self.artist_url = album['artists'][0]['id']
+                        sp_artist_name = album['artists'][0]['name']
+                        found = True
+                        break
+                off += 50
+        except:
+            print("Error during search.")
+
+        # Pass artist url as list of one to find recommendations.
+        artist_seed = []
+        artist_seed.append(self.artist_url)
+        rec = sp.recommendations(seed_artists=artist_seed, limit=20)
+
+        # Raise exception if no recommendations are found.
+        if len(rec['tracks']) == 0:
+            raise Exception
+
+        # Find all recommended songs that have a preview URL and store them in a list with the parent artist URL.
+        for track in rec['tracks']:
+            if track['preview_url'] is not None:
+
+                preview_url = track['preview_url']
+                title = track['name # Raise exception if no recommendations are found.']
+
+                art_name = track['album']['artists'][0]['name']
+                data = [art_name, title, preview_url, artist_name]
+
+                # Pass list to list in order to check later if information has already been gathered.
+                recommendations.append(data)
+        self.recommendations.append(recommendations)
+        self.fillRecommendationBox(recommendations, artist_name)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # API call to get song recommendations by Song name and Artist name.
+    def songRecommendationByTrackArtist(self, track_name, artist_name):
+        artist_url = ''
+        recommendations = []
+        sp = spotipy.Spotify(
+            client_credentials_manager=SpotifyClientCredentials())
+
+        found = False
+        off = 0
+        # Recursively call on spotify API to find artist url.
+        try:
+            while (found is False or off < 150):
+                track_search = sp.search(
+                    q='track:'+track_name+' '+'artist:'+artist_name, limit=50, type='track', offset=off)
+
+                for track in track_search['tracks']['items']:
+                    artist_url = track['artists'][0]['id']
+                    found = True
+                    # print(str(artist_url))
+                    break
+
+                off += 50
+        except:
+            print("Error during Spotify search.")
+
+        # Pass artist url as list of one to find recommendations.
+        artist_seed = []
+        artist_seed.append(artist_url)
+        try:
+            rec = sp.recommendations(seed_artists=artist_seed, limit=20)
+        except:
+            print("Error during search")
+
+        # Raise exception if no recommendations are found.
+        if len(rec['tracks']) == 0:
+            raise Exception("No recommendations")
+
+        # Find all recommended songs that have a preview URL and store them in a list with the parent artist URL.
+        for track in rec['tracks']:
+            if track['preview_url'] is not None:
+
+                preview_url = track['preview_url']
+                title = track['name']
+                art_name = track['album']['artists'][0]['name']
+                data = [art_name, title, preview_url, artist_name]
+
+                # Pass list to list in order to check later if information has already been gathered.
+                recommendations.append(data)
+        self.recommendations.append(recommendations)
+        self.fillRecommendationBox(recommendations, artist_name)
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # On next button select next song to load and play.
     def OnNext(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current < self.playlistBox.GetItemCount()-1:
@@ -995,6 +1005,8 @@ class Ultra(wx.Frame):
             self.playlistBox.Select(current, on=0)
             self.playlistBox.Select(current, on=1)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # On previous button select previous song to load and play.
     def OnPrev(self, event):
         current = self.playlistBox.GetFocusedItem()
         if current > self.playlistBox.GetTopItem():
@@ -1006,30 +1018,42 @@ class Ultra(wx.Frame):
             self.playlistBox.Select(current, on=0)
             self.playlistBox.Select(current, on=1)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Pause player.
     def OnPause(self):
         self.Player.Pause()
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Play song.
     def OnPlay(self, event):
         if not event.GetEventObject().GetValue():
             self.OnPause()
             return
 
+        # Error if no song loaded.
         if not self.Player.Play():
             self.ButtonPlay.SetValue(False)
             wx.MessageBox("A file must be selected.",
                           "ERROR", wx.ICON_ERROR | wx.OK)
 
+        # Set player slider to beginning if the song starts.
         else:
             self.PlayerSlider.SetRange(0, self.Player.Length())
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Option to grab slider and seek song.
     def OnSeek(self, event):
         value = self.PlayerSlider.GetValue()
         self.Player.Seek(value)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Handle volume adjustments.
     def onVolume(self, event):
         self.currentVolume = self.volumeCtrl.GetValue()
         self.Player.SetVolume(self.currentVolume/100)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Handle filter button to filter songs by attributes.
     def onFilter(self, event):
         txt = self.enterPref.GetValue()
         idxsel = self.combo.GetCurrentSelection()
@@ -1066,6 +1090,8 @@ class Ultra(wx.Frame):
 
         self.clearPanel()
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Handle song rating *.db. Update values when rating songs.
     def onRate(self, event):
         cur = self.playlistBox.GetFocusedItem()
         artist = self.playlistBox.GetItem(itemIdx=cur, col=0)
@@ -1085,6 +1111,8 @@ class Ultra(wx.Frame):
                     '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),title.GetText()))
         self.conn.commit() """
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    # Timer that follows song playback constantly. If repeat is pressed it selects the same song to call self.loadsong().
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
@@ -1103,6 +1131,8 @@ class Ultra(wx.Frame):
                     current, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
                 self.playlistBox.Select(current, on=1)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 
 app = wx.App()
