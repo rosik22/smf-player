@@ -31,10 +31,6 @@ os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
 # Currently loaded songs.
 currentpl = 'playing.db'
 
-# Rating database.
-ratingdb = 'rating.db'
-
-
 class Ultra(wx.Frame):
     def __init__(self, parent, id):
 
@@ -45,7 +41,7 @@ class Ultra(wx.Frame):
 
         # Establish connection with the databases
         self.establishConnectionRun()
-        self.establishConnectionRating()
+        #self.establishConnectionRating()
 
         # Set self color.
         self.SetBackgroundColour("Black")
@@ -117,7 +113,7 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     # Steps to do after closing window. Like disconnecting from db.
     def OnClose(self, e):
-        self.conn.close()
+        self.conn1.close()
         self.Player.SetVolume(1.0)
         self.Destroy()
 
@@ -169,8 +165,8 @@ class Ultra(wx.Frame):
 
                 # Load data on blank space.
                 try:
-                    self.curs.execute('DELETE FROM playlist;')
-                    self.conn.commit()
+                    self.curs1.execute('DELETE FROM playlist;')
+                    self.conn1.commit()
                     self.countAddToPlaylist += 1
                     self.playlistBox.DeleteAllItems()
                     self.clearPanel()
@@ -194,8 +190,8 @@ class Ultra(wx.Frame):
 
                 # Clear all boxes and load current file by pathname.
                 try:
-                    self.curs.execute('DELETE FROM playlist;')
-                    self.conn.commit()
+                    self.curs1.execute('DELETE FROM playlist;')
+                    self.conn1.commit()
                     self.playlistBox.DeleteAllItems()
                     self.countAddToPlaylist += 1
                     self.Player.Load(pathname)
@@ -448,14 +444,14 @@ class Ultra(wx.Frame):
         songTitle = str(d[1])
 
         # Find path of selected song.
-        self.curs.execute(
+        self.curs1.execute(
             '''SELECT path FROM playlist WHERE artist=? AND title=?''', (artistName, songTitle))
-        path = ''.join(self.curs.fetchone())
+        path = ''.join(self.curs1.fetchone())
 
         # Get the amount of times the file has been played.
-        self.curs.execute(
+        self.curs1.execute(
             '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
-        timesplayed = int(self.curs.fetchone()[0])
+        timesplayed = int(self.curs1.fetchone()[0])
 
         # Check if the path leads to a file.
         if os.path.isfile(path):
@@ -529,31 +525,31 @@ class Ultra(wx.Frame):
                               "ERROR", wx.ICON_ERROR | wx.OK)
                 self.playlistBox.DeleteItem(self.playlistBox.GetFocusedItem())
                 self.clearPanel()
-                self.curs.execute(
+                self.curs1.execute(
                     '''DELETE FROM playlist WHERE path=?''', (path,))
-                self.conn.commit()
+                self.conn1.commit()
                 evt = wx.CommandEvent(
                     wx.wxEVT_COMMAND_BUTTON_CLICKED, self.ButtonNext.GetId())
                 wx.PostEvent(self.ButtonNext, evt)
             # If the file is found, then update the location in the database.
             else:
-                self.curs.execute(
+                self.curs1.execute(
                     '''UPDATE playlist SET path=? WHERE path=?''', (currpath, path))
-                self.conn.commit()
+                self.conn1.commit()
                 self.loadSong(row)
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Sets the counter for each song based on the times they played the song
     def setTimesPlayed(self, path, row):
         # Finds the current value of the counter in the database
-        self.curs.execute(
+        self.curs1.execute(
             '''SELECT timesplayed FROM playlist WHERE path=?''', (path,))
-        t = int(self.curs.fetchone()[0])
+        t = int(self.curs1.fetchone()[0])
         t += 1
         # Inputs the new incremented value of the counter
-        self.curs.execute(
+        self.curs1.execute(
             '''UPDATE playlist SET timesplayed=? WHERE path=?''', (t, path))
-        self.conn.commit()
+        self.conn1.commit()
         self.playlistBox.SetItem(row, 3, str(t))
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -612,9 +608,9 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     # Loads data from playlist whilst formatting the query to a standart list instead of a tuple.
     def loadPlaylist(self):
-        self.curs1.row_factory = lambda cursor, row: row[0]
-        self.curs1.execute('''SELECT path FROM playlist''')
-        data = self.curs1.fetchall()
+        self.curs.row_factory = lambda cursor, row: row[0]
+        self.curs.execute('''SELECT path FROM playlist''')
+        data = self.curs.fetchall()
         return data
 
 #-----------------------------------------------------------------------------------------------------------------------#
@@ -622,9 +618,9 @@ class Ultra(wx.Frame):
     def fillPlaylistBox(self, data):
         # Searches the database for rating if it exists
         list1 = (data[2], data[0], data[1])
-        self.curs2.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
+        self.curs1.execute('''SELECT rating FROM rate WHERE artist=? AND title=?''', (str(
             list1[0]), str(list1[1])))
-        rate = str(self.curs2.fetchone()[0])
+        rate = str(self.curs1.fetchone()[0])
 
         self.playlistBox.InsertItem(self.countListCttl, list1[0])
         self.playlistBox.SetItem(self.countListCttl, 1, str(list1[1]))
@@ -655,76 +651,64 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     # Create table for the currently running playlist.
     def createTableRunning(self):
-        self.curs.execute('''CREATE TABLE IF NOT EXISTS playlist
+        self.curs1.execute('''CREATE TABLE IF NOT EXISTS playlist
                             (title VARCHAR(255) UNIQUE,
                             duration VARCHAR(255),
                             artist VARCHAR(255),
                             year VARCHAR(255),
                             path VARCHAR(255),
                             timesplayed VARCHAR(255))''')
-        self.curs.execute('DELETE FROM playlist;')
-        self.conn.commit()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with currentpl
-    def establishConnectionRun(self):
-        self.conn = None
-        try:
-            self.conn = sqlite3.connect(currentpl)
-        except sqlite3.Error as e:
-            print(e)
-            print("Unable to establish connection to database...\n")
-
-        self.curs = self.conn.cursor()
-        self.createTableRunning()
+        self.curs1.execute('DELETE FROM playlist;')
+        self.conn1.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # create the table of ratingdb
     def createTableRating(self):
-        self.curs2.execute('''CREATE TABLE IF NOT EXISTS rate
+        self.curs1.execute('''CREATE TABLE IF NOT EXISTS rate
                             (title VARCHAR(255) UNIQUE,
                             artist VARCHAR(255),
                             rating VARCHAR(255))''')
-        self.conn2.commit()
+        self.conn1.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with ratingdb
-    def establishConnectionRating(self):
-        self.conn2 = None
-        try:
-            self.conn2 = sqlite3.connect(ratingdb)
-        except sqlite3.Error as e:
-            print(e)
-            print("Unable to establish connection to database...\n")
-
-        self.curs2 = self.conn2.cursor()
-        self.createTableRating()
-
-#-----------------------------------------------------------------------------------------------------------------------#
-    # Establish connection with saved playlist's database
-    def establishConnectionPl(self, path):
+    # Establish connection with currentpl
+    def establishConnectionRun(self):
         self.conn1 = None
         try:
-            self.conn1 = sqlite3.connect(path)
+            self.conn1 = sqlite3.connect(currentpl)
         except sqlite3.Error as e:
             print(e)
             print("Unable to establish connection to database...\n")
 
         self.curs1 = self.conn1.cursor()
+        self.createTableRunning()
+        self.createTableRating()
+
+#-----------------------------------------------------------------------------------------------------------------------#
+    # Establish connection with saved playlist's database
+    def establishConnectionPl(self, path):
+        self.conn = None
+        try:
+            self.connn = sqlite3.connect(path)
+        except sqlite3.Error as e:
+            print(e)
+            print("Unable to establish connection to database...\n")
+
+        self.curs = self.conn1.cursor()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Insert data into ratingdb
     def playlistrate(self, data):
-        self.curs2.execute('''REPLACE INTO rate(title, artist, rating)
+        self.curs1.execute('''REPLACE INTO rate(title, artist, rating)
                     VALUES(?, ?, (select rating from rate where title=? and artist=?))''', (data[0], data[2], data[0], data[2]))
-        self.conn2.commit()
+        self.conn1.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Add new songs to database.
     def playlistd(self, data):
-        self.curs.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed)
+        self.curs1.execute('''REPLACE INTO playlist(title,duration,artist,year,path,timesplayed)
                     VALUES(?,?,?,?,?,?)''', (data[0], data[1], data[2], data[3], data[4], 0))
-        self.conn.commit()
+        self.conn1.commit()
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Operates with ID3 tags
@@ -1068,7 +1052,7 @@ class Ultra(wx.Frame):
                     self.playlistBox.DeleteItem(row)
                     self.curs.execute(
                         '''DELETE FROM playlist WHERE artist=? AND title=?''', (item.GetText(), title.GetText()))
-                    self.conn.commit()
+                    self.conn1.commit()
                     rows -= 1
                     row -= 1
                 row += 1
@@ -1081,9 +1065,9 @@ class Ultra(wx.Frame):
                 item = self.playlistBox.GetItem(itemIdx=row, col=1)
                 if item.GetText().lower() != txt.lower():
                     self.playlistBox.DeleteItem(row)
-                    self.curs.execute(
+                    self.curs1.execute(
                         '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(), item.GetText()))
-                    self.conn.commit()
+                    self.conn1.commit()
                     rows -= 1
                     row -= 1
                 row += 1
@@ -1098,18 +1082,9 @@ class Ultra(wx.Frame):
         title = self.playlistBox.GetItem(itemIdx=cur, col=1)
         self.playlistBox.SetItem(cur, 4, event.GetString())
         rate = event.GetString()
-        self.curs2.execute('''UPDATE rate SET rating=? WHERE artist=? AND title=?''',
+        self.curs1.execute('''UPDATE rate SET rating=? WHERE artist=? AND title=?''',
                            (rate, artist.GetText(), title.GetText()))
-        self.conn2.commit()
-
-    """ def onKey(self, event):
-        cur = self.playlistBox.GetFocusedItem()
-        self.playlistBox.DeleteItem(cur)
-        artist = self.playlistBox.GetItem(itemIdx=cur, col=0)
-        title = self.playlistBox.GetItem(itemIdx=cur, col=1)
-        self.curs.execute(
-                    '''DELETE FROM playlist WHERE artist=? AND title=?''', (artist.GetText(),title.GetText()))
-        self.conn.commit() """
+        self.conn1.commit()
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     # Timer that follows song playback constantly. If repeat is pressed it selects the same song to call self.loadsong().
