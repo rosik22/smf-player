@@ -496,7 +496,7 @@ class Ultra(wx.Frame):
                             break
                 if found is False and timesplayed < 1:
                     try:
-                        self.songRecommendationByTrackArtist(
+                        self.songRecommendationByAlbumArtist(
                             songTitle, artistName)
                     except:
                         print("No recommendations by Album/Artist...")
@@ -899,10 +899,10 @@ class Ultra(wx.Frame):
         found = False
         # Recursively call on spotify API to find artist url.
         try:
-            while (found is False and off < 150):
+            while (found is False and off < 100):
                 # Search for album in spotify.
                 album_search = sp.search(
-                    q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album')
+                    q='album:'+album_name+' '+'artist:'+artist_name, limit=50, type='album', offset=off)
 
                 for album in album_search['albums']['items']:
                     album_name_sp = album['name']
