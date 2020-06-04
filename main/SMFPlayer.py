@@ -100,7 +100,7 @@ class Ultra(wx.Frame):
         # Timer for the playback scroll.
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
-        self.timer.Start(100)
+        self.timer.Start(50)
 
         # Create menu on top left of application.
         self.createMenu()
@@ -1116,7 +1116,7 @@ class Ultra(wx.Frame):
     def onTimer(self, event):
         value = self.Player.Tell()
         self.PlayerSlider.SetValue(value)
-        if self.ButtonRepeat.GetValue() == False:
+        if not self.ButtonRepeat.GetValue():
             if value > self.Player.Length():
                 current = self.playlistBox.GetFocusedItem()
                 if current < self.playlistBox.GetItemCount()-1:
@@ -1124,12 +1124,14 @@ class Ultra(wx.Frame):
                         current+1, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                     self.playlistBox.Select(current, on=0)
                     self.playlistBox.Select(current+1, on=1)
-        elif self.ButtonRepeat.GetValue() is True:
-            if value > self.Player.Length():
+        if self.ButtonRepeat.GetValue():
+            if value >= self.Player.Length():
                 current = self.playlistBox.GetFocusedItem()
                 self.playlistBox.SetItemState(
                     current, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=0)
+                self.playlistBox.SetItemState(
+                    current, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 self.playlistBox.Select(current, on=1)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
