@@ -136,3 +136,6 @@ dmypy.json
 
 #Ignore file
 tomergewith.py
+
+# Music files
+*.mp3
