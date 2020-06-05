@@ -43,6 +43,8 @@ For RHL based:
 `    -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/fedora-30/ \`
 `    wxPython`
 
+For more versions and/or issues with wxPython, visit: [wxpython.org](https://wxpython.org/pages/downloads/)
+
 
 And finally. You'll need to supply your own API keys for AcoustID, LastFM and Spotify.
 
