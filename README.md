@@ -30,7 +30,7 @@ You then may install wxPython separately if you're on Windows or MacOS by runnin
 For Debian based:
 
 `pip install -U \`
-`    -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04 \`
+`    -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 \`
 `    wxPython`
 
 For Arch based:
