@@ -19,7 +19,7 @@ More can be said but it's best to try it out. The GUI is written in wxPython.
 
 First install all prerequisites by running:
 
-`pip3 install -U prerequisites.txt` or `pip install -U prerequisites.txt`
+`pip3 install -r prerequisites.txt` or `pip install -r prerequisites.txt`
 
 You then may install wxPython separately if you're on Windows or MacOS by running:
 
