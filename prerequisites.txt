@@ -1,0 +1,4 @@
+pyacoustid
+spotipy
+mutagen
+pillow

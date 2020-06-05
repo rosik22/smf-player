@@ -26,7 +26,7 @@ from mutagen import File as MutaFile
 
 os.environ['SPOTIPY_CLIENT_ID'] = 'set-client-id-here'
 os.environ['SPOTIPY_CLIENT_SECRET'] = 'set-client-secret-here'
-os.environ['SPOTIPY_REDIRECT_URI'] = 'set-redirect-uri-here'
+os.environ['SPOTIPY_REDIRECT_URI'] = 'set-client-uri-here'
 
 # Set LastFM key here.
 lkey = ''
@@ -833,6 +833,10 @@ class Ultra(wx.Frame):
         try:
             link = urllib.request.urlopen(url)
             parsed = json.load(link)
+
+        except:
+            print("Failed to load cover.")
+
             try:
                 # First try loading an image from ID3
                 tags = ID3(path)
@@ -841,13 +845,14 @@ class Ultra(wx.Frame):
                 image = Image.open(BytesIO(filename))
                 self.displayimage(image)
             except:
-                imagelinks = parsed['track']['album']['image']
-                imagelink = imagelinks[3]['#text']
-                filename = urllib.request.urlopen(imagelink)
-                image = Image.open(filename)
-                self.displayimage(image)
-        except:
-            print("Failed to load cover.")
+                try:
+                    imagelinks = parsed['track']['album']['image']
+                    imagelink = imagelinks[3]['#text']
+                    filename = urllib.request.urlopen(imagelink)
+                    image = Image.open(filename)
+                    self.displayimage(image)
+                except:
+                    print("Failed to load cover.")
 
 #-----------------------------------------------------------------------------------------------------------------------#
     # Load conver PIL image to wx.Image file and load it to a static bitmap.
