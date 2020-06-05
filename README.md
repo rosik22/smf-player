@@ -48,4 +48,4 @@ And finally. You'll need to supply your own API keys for AcoustID, LastFM and Sp
 
 You'll need to input them here:
 
-![Place for API keys](https://github.com/roterabe/smf-player/blob/master/example.png)
+![Place for API keys](https://github.com/roterabe/smf-player/blob/master/keys.png)
