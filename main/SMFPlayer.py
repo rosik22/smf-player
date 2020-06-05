@@ -24,12 +24,19 @@ from shutil import copyfile
 from mutagen.id3 import ID3
 from mutagen import File as MutaFile
 
-os.environ['SPOTIPY_CLIENT_ID'] = 'bbb9a6588df14fd585de0828d261b899'
-os.environ['SPOTIPY_CLIENT_SECRET'] = '7320b96d25b44f78ae22f8bd2aaece8d'
-os.environ['SPOTIPY_REDIRECT_URI'] = 'http://127.0.0.1:9090'
+os.environ['SPOTIPY_CLIENT_ID'] = 'set-client-id-here'
+os.environ['SPOTIPY_CLIENT_SECRET'] = 'set-client-secret-here'
+os.environ['SPOTIPY_REDIRECT_URI'] = 'set-redirect-uri-here'
+
+# Set LastFM key here.
+lkey = ''
+
+# Set acoustid key here.
+akey = ''
 
 # Currently loaded songs.
 currentpl = 'playing.db'
+
 
 class Ultra(wx.Frame):
     def __init__(self, parent, id):
@@ -41,7 +48,7 @@ class Ultra(wx.Frame):
 
         # Establish connection with the databases
         self.establishConnectionRun()
-        #self.establishConnectionRating()
+        # self.establishConnectionRating()
 
         # Set self color.
         self.SetBackgroundColour("Black")
@@ -323,7 +330,6 @@ class Ultra(wx.Frame):
 #-----------------------------------------------------------------------------------------------------------------------#
     # Sets the layout for the player.
 
-
     def createLayout(self):
         try:
             self.Player = wx.media.MediaCtrl(self, style=wx.SIMPLE_BORDER)
@@ -413,7 +419,7 @@ class Ultra(wx.Frame):
         image = image.Scale(25, 30, wx.IMAGE_QUALITY_HIGH)
         result = wx.Bitmap(image)
         return result
-        
+
 #-----------------------------------------------------------------------------------------------------------------------#
     # Clears playback, cover art panel and sets button to stopped.
     def clearPanel(self):
@@ -787,7 +793,9 @@ class Ultra(wx.Frame):
         fing = fing[1]
         fing = str(fing)
         fing = fing[2:-1]
-        url = 'https://api.acoustid.org/v2/lookup?client=Bklmy2zJQL&meta=recordings+releasegroups+compress&duration='
+        url = 'https://api.acoustid.org/v2/lookup?client='
+        url += akey
+        url += '&meta=recordings+releasegroups+compress&duration='
         url += str(self.d)
         url += '&fingerprint='
         url += fing
@@ -818,8 +826,9 @@ class Ultra(wx.Frame):
     def makeCover(self, track_name, artist_name, path):
         # Set a blank bitmap on the static bitmap.
         self.disp.SetBitmap(wx.Bitmap(wx.Image(500, 500)))
-        url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key=5240ab3b0de951619cb54049244b47b5&artist='
-        url += urllib.parse.quote(artist_name) + \
+        url = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&format=json&api_key='
+        url += lkey
+        url += '&artist=' + urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
         try:
             link = urllib.request.urlopen(url)
@@ -868,8 +877,9 @@ class Ultra(wx.Frame):
         print(artist_name + ' -- ' + track_name)
         # Get album name for reference from LastFM API.
         album_name = ''
-        uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&api_key=5240ab3b0de951619cb54049244b47b5&format=json&artist='
-        uurl += urllib.parse.quote(artist_name) + \
+        uurl = 'http://ws.audioscrobbler.com/2.0/?method=track.getInfo&limit=10&format=json&api_key='
+        uurl += lkey
+        uurl += '&artist=' + urllib.parse.quote(artist_name) + \
             '&track=' + urllib.parse.quote(track_name)
 
         uurlink = urllib.request.urlopen(uurl)
