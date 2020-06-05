@@ -19,11 +19,11 @@ More can be said but it's best to try it out. The GUI is written in wxPython.
 
 First install all prerequisites by running:
 
-`pip3 install prerequisites.txt` or `pip install prerequisites`
+`pip3 install -U prerequisites.txt` or `pip install -U prerequisites.txt`
 
 You then may install wxPython separately if you're on Windows or MacOS by running:
 
-`pip3 install wxPython` or `pip install wxPython`
+`pip3 install -U wxPython` or `pip install -U wxPython`
 
 **If you're on Linux:**
 
@@ -46,6 +46,6 @@ For RHL based:
 
 And finally. You'll need to supply your own API keys for AcoustID, LastFM and Spotify.
 
-You'll need to input them here:
+You'll need to input them on the top of the SMFPlayer.py file here:
 
 ![Place for API keys](https://github.com/roterabe/smf-player/blob/master/keys.png)
