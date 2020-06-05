@@ -11,4 +11,41 @@ More can be said but it's best to try it out. The GUI is written in wxPython.
 
 
 
-![Image of Yaktocat](https://github.com/roterabe/smf-player/blob/master/example.png)
+![Image of player](https://github.com/roterabe/smf-player/blob/master/example.png)
+
+
+
+# Usage
+
+First install all prerequisites by running:
+
+`pip3 install prerequisites.txt` or `pip install prerequisites`
+
+You then may install wxPython separately if you're on Windows or MacOS by running:
+
+`pip3 install wxPython` or `pip install wxPython`
+
+**If you're on Linux:**
+
+For Debian based:
+
+`pip install -U \`
+`    -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04 \`
+`    wxPython`
+
+For Arch based:
+
+`sudo pacman -Syu wxPython`
+
+For RHL based:
+
+`pip install -U \`
+`    -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/fedora-30/ \`
+`    wxPython`
+
+
+And finally. You'll need to supply your own API keys for AcoustID, LastFM and Spotify.
+
+You'll need to input them here:
+
+![Place for API keys](https://github.com/roterabe/smf-player/blob/master/example.png)
