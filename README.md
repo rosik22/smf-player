@@ -15,7 +15,7 @@ More can be said but it's best to try it out. The GUI is written in wxPython.
 
 
 
-# Usage
+# Prerequisites
 
 First install all prerequisites by running:
 
@@ -45,9 +45,14 @@ For RHL based:
 
 For more versions and/or issues with wxPython, visit: [wxpython.org](https://wxpython.org/pages/downloads/)
 
+Then you'll need API keys:
 
-And finally. You'll need to supply your own API keys for AcoustID, LastFM and Spotify.
+Go to: [spotify-dashboard-page](https://developer.spotify.com/dashboard/applications). There you'll have to make a new app (it's free) and you'll receive keys to input in the app. **NOTICE:** Set the redirect URI to 127.0.0.1/8080
+If you'd like to have songs that are not ID3 tagged to be indexed then you'll also need a key from acoustid: [AcoustID](https://acoustid.org/login?return_url=https%3A%2F%2Facoustid.org%2Fnew-application)
+And if you'd like to have a faster search for song recommendations, you'll need a LastFM API key (altough it's not necessary): [LastFM](https://secure.last.fm/login?next=/api/account/create)
 
-You'll need to input them on the top of the SMFPlayer.py file here:
+And finally. You'll need to enter your keys in the app.
+
+You'll need to input them on the top of the smf-player.py file here:
 
 ![Place for API keys](https://github.com/roterabe/smf-player/blob/master/keys.png)
