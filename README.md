@@ -48,7 +48,9 @@ For more versions and/or issues with wxPython, visit: [wxpython.org](https://wxp
 Then you'll need API keys:
 
 Go to: [spotify-dashboard-page](https://developer.spotify.com/dashboard/applications). There you'll have to make a new app (it's free) and you'll receive keys to input in the app. **NOTICE:** Set the redirect URI to 127.0.0.1/8080
+
 If you'd like to have songs that are not ID3 tagged to be indexed then you'll also need a key from acoustid: [AcoustID](https://acoustid.org/login?return_url=https%3A%2F%2Facoustid.org%2Fnew-application)
+
 And if you'd like to have a faster search for song recommendations, you'll need a LastFM API key (altough it's not necessary): [LastFM](https://secure.last.fm/login?next=/api/account/create)
 
 And finally. You'll need to enter your keys in the app.
